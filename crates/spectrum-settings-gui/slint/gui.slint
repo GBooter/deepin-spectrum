@@ -1,0 +1,837 @@
+// 设置界面 v0.5.0（Slint 1.18，GPL-3.0-only）。
+//
+// 设计约束（写在这里，免得以后改 UI 时忘掉）：
+// 1. 只列已实现的键。界面上出现「改了没反应」的控件比没有这个控件更糟。
+// 2. 所有数值显示由 Rust 侧给字符串，Slint 侧不做浮点格式化。
+// 3. 全部可翻译文案集中在 `Strings` 结构里，由 Rust 侧一次回填；
+//    Slint 文件里不写死中文（英文 kicker / 编号 / 键名除外）。
+// 4. 配色走 Palette，自动跟随系统深浅色。
+// 5. ★ 预置色卡不用 GridLayout + repeater 的 `row/col`：实测 1.18.1 下
+//    行列不会按 repeater 索引生效，卡片会被压成一列且高度不足，文字全糊。
+//    改用「分类组件 PresetSection + HorizontalBox 一行 N 卡」，高度显式给足。
+// 6. API 依据（已实测 1.18.1）：布局需 import；Slider 步进叫 `step`；
+//    Text 对齐叫 `horizontal-alignment`；根组件不能叫 `opacity`；
+//    Window 不能同时给 `height` 与 `min-height`；ComboBox 有 `selected(string)`。
+
+import {
+    Button, CheckBox, ComboBox, HorizontalBox, LineEdit, Palette,
+    ScrollView, Slider, VerticalBox
+} from "std-widgets.slint";
+
+/// 全部界面文案（字段与 `i18n.rs` 的 `Strings` 一一对应）。
+export struct Strings {
+    app_name: string, contents: string, mast_title: string, mast_subtitle: string,
+    custom_label: string,
+    nav_presets: string, nav_tune: string, nav_motion: string, nav_runtime: string,
+    nav_about: string, about_title: string, about_kicker: string,
+    about_tagline: string, about_author: string, about_email: string,
+    about_license: string, about_version: string, about_stack: string,
+    about_license_note: string, about_license_file: string, about_thanks: string,
+    theme_paper: string, theme_ink: string, stage_kicker: string,
+    dock_dark: string, dock_light: string, slow_on: string, slow_off: string,
+    play: string, pause: string, presets_title: string, presets_desc: string,
+    group_hint: string, mine_title: string, mine_desc: string,
+    save_hint: string, save_btn: string, delete_btn: string, use_btn: string,
+    save_bar_title: string, save_bar_desc: string,
+    now_label: string, best_dark: string, best_light: string, best_both: string,
+    tune_title: string, opacity: string, bands: string, gap: string,
+    color_start: string, color_end: string, fx_title: string, fx_desc: string,
+    fx_enable: string, fx_hold: string, fx_fall: string, fx_gravity: string,
+    palette_title: string, palette_desc: string, palette_mode: string,
+    palette_stops: string, pm_off: string, pm_across: string,
+    pm_per_bar: string, pm_vertical: string,
+    motion_title: string, sensitivity: string, attack: string, release: string,
+    db_floor: string, fft: string, runtime_title: string, start: string,
+    stop: string, autostart: string, tray: string, fullscreen: string,
+    silence_dbfs: string, silence_timeout: string,
+    runtime_mode_label: string, mode_full: string, mode_above: string,
+    footer_reset: string, footer_hint: string, status_saved: string,
+    status_applied: string, status_custom: string, lang_label: string,
+}
+
+/// 一张预置色卡。`c0..c4` 是色带的五段取样（双色预置为线性插值）。
+export struct PresetCard {
+    id: string, no: string, name: string, en: string, keys: string,
+    c0: color, c1: color, c2: color, c3: color, c4: color, selected: bool,
+}
+
+/// 一套「我的方案」列表项。
+export struct UserCard {
+    id: string, name: string, meta: string, active: bool,
+}
+
+/// 一个情绪分类：标题 + 一行色卡。
+/// 抽成组件是为了让六个分区共享同一套高度/间距，避免逐段复制时漂移。
+component PresetSection inherits VerticalBox {
+    in property <string> title;
+    in property <string> sub;
+    in property <[PresetCard]> cards;
+    callback picked(string);
+    spacing: 5px;
+
+    HorizontalBox {
+        spacing: 10px;
+        Text { text: root.title; color: Palette.foreground; font-size: 16px; font-weight: 700; }
+        Text { text: root.sub; color: Palette.alternate-foreground; font-size: 9px; vertical-alignment: center; }
+        Rectangle { horizontal-stretch: 1; }
+    }
+    Rectangle { height: 1px; background: Palette.border; }
+    HorizontalBox {
+        height: 148px;
+        spacing: 8px;
+        for card in root.cards : Rectangle {
+            horizontal-stretch: 1;
+            background: card.selected ? Palette.border : transparent;
+            border-width: 1px;
+            border-color: card.selected ? #c8302a : Palette.border;
+            VerticalBox {
+                padding: 7px;
+                spacing: 2px;
+                HorizontalBox {
+                    height: 40px;
+                    spacing: 0px;
+                    padding: 0px;
+                    Rectangle { background: card.c0; horizontal-stretch: 1; }
+                    Rectangle { background: card.c1; horizontal-stretch: 1; }
+                    Rectangle { background: card.c2; horizontal-stretch: 1; }
+                    Rectangle { background: card.c3; horizontal-stretch: 1; }
+                    Rectangle { background: card.c4; horizontal-stretch: 1; }
+                }
+                Text { text: card.no; color: Palette.alternate-foreground; font-size: 9px; }
+                Text {
+                    text: card.name;
+                    color: card.selected ? #c8302a : Palette.foreground;
+                    font-size: 14px; font-weight: 700;
+                }
+                Text { text: card.en; color: Palette.alternate-foreground; font-size: 9px; }
+                Text { text: card.keys; color: Palette.alternate-foreground; font-size: 9px; }
+                Rectangle { vertical-stretch: 1; }
+            }
+            TouchArea { clicked => { root.picked(card.id); } }
+        }
+    }
+}
+
+/// 「调好了就存下来」保存条：微调页与动态页共用同一份输入。
+component SaveBar inherits VerticalBox {
+    in-out property <string> value;
+    in property <string> title;
+    in property <string> desc;
+    in property <string> hint;
+    in property <string> button;
+    callback save();
+    spacing: 6px;
+
+    Rectangle { height: 1px; background: Palette.border; }
+    Text { text: root.title; color: Palette.foreground; font-size: 16px; font-weight: 700; }
+    Text { text: root.desc; color: Palette.alternate-foreground; font-size: 11px; wrap: word-wrap; }
+    HorizontalBox {
+        spacing: 8px;
+        LineEdit {
+            text <=> root.value;
+            placeholder-text: root.hint;
+            horizontal-stretch: 1;
+            accepted(text) => { root.value = text; root.save(); }
+        }
+        Button { text: root.button; clicked => { root.save(); } }
+    }
+}
+
+export component Gui inherits Window {
+    title: root.s.app_name;
+    preferred-width: 1120px;
+    preferred-height: 840px;
+    min-width: 780px;
+    min-height: 560px;
+    background: Palette.background;
+    // Treeland 只在 client 模式下隐藏原生标题栏，且从不回 decoration configure；
+    // winit 的 Adwaita 客户端标题栏又会在没有服务端装饰时出现（中文渲染成方块）。
+    // 因此 Treeland 会话走无边框 + 下方自绘标题栏；X11/普通 Wayland 保持
+    // 窗管原生标题栏，不显示自绘这一条。
+    in-out property <bool> frameless: false;
+    no-frame: root.frameless;
+    // 无边框窗口靠边缘拖拽调整大小（winit 支持）；有原生标题栏时不需要。
+    resize-border-width: root.frameless ? 6px : 0px;
+
+    // ---- 文案 / 导航 / 语言 ----
+    in-out property <Strings> s;
+    in-out property <bool> lang_en: false;
+    in-out property <int> panel_index: 0;
+
+    // ---- 动画预览（B 档）----
+    in-out property <image> preview_image;
+    in-out property <bool> preview_dark: true;
+    in-out property <bool> preview_playing: true;
+    in-out property <bool> preview_slow: false;
+
+    // ---- 情绪分类：6 个分区，每个一行 5 张色卡 ----
+    in-out property <[string]> group_titles;
+    in-out property <[string]> group_subs;
+    in-out property <[PresetCard]> group0;
+    in-out property <[PresetCard]> group1;
+    in-out property <[PresetCard]> group2;
+    in-out property <[PresetCard]> group3;
+    in-out property <[PresetCard]> group4;
+    in-out property <[PresetCard]> group5;
+
+    // ---- 我的方案 ----
+    in-out property <[UserCard]> user_cards;
+    in-out property <string> preset_status: "";
+    in-out property <string> save_name: "";
+    in-out property <string> now_name: "";
+    in-out property <string> now_meta: "";
+
+    // ---- 05 关于（专有名词由 Rust 注入，标签走 s 表）----
+    in-out property <string> about_author: "";
+    in-out property <string> about_email: "";
+    in-out property <string> about_version: "";
+
+    // ---- 语言相关选项标签 ----
+    in-out property <[string]> mode_labels;
+    in-out property <[string]> palette_mode_labels;
+    in-out property <int> palette_mode_index: 0;
+    in-out property <[color]> palette_swatch;
+    in-out property <string> palette_info: "";
+
+    // ---- 状态行 ----
+    in-out property <string> status_text: "";
+    in-out property <bool> status_error: false;
+
+    // ---- 配置值（与 config.toml 一一对应）----
+    in-out property <bool> enabled: true;
+    in-out property <float> opacity_value: 0.65;
+    in-out property <float> bands_value: 64;
+    in-out property <float> gap_value: 0.2;
+    in-out property <string> color_start: "#00C8FF";
+    in-out property <string> color_end: "#7B61FF";
+    in-out property <color> preview_start: #00c8ff;
+    in-out property <color> preview_end: #7b61ff;
+    // 多色标字符串：界面不直接编辑，但必须回写，否则换预置后会被旧值覆盖。
+    in-out property <string> palette_value: "";
+
+    in-out property <float> sensitivity_value: 1.0;
+    in-out property <float> attack_value: 0.55;
+    in-out property <float> release_value: 0.12;
+    in-out property <float> db_floor_value: -80.0;
+    in-out property <float> fft_index_value: 2;
+    in-out property <float> silence_dbfs_value: -62.0;
+    in-out property <float> silence_timeout_value: 800;
+
+    in-out property <bool> peak_cap: true;
+    in-out property <float> peak_hold_value: 800;
+    in-out property <float> peak_fall_value: 0.02;
+    in-out property <bool> peak_gravity: false;
+    in-out property <string> peak_hold_text: "800 ms";
+    in-out property <string> peak_fall_text: "0.020";
+
+    in-out property <bool> autostart: false;
+    in-out property <bool> tray_enabled: false;
+    in-out property <bool> hide_on_fullscreen: true;
+    in-out property <int> display_mode: 0;
+    in-out property <bool> daemon_running: false;
+    in-out property <string> daemon_status_text: "";
+    in-out property <bool> color_start_focused: false;
+    in-out property <bool> color_end_focused: false;
+
+    // ---- 数值文案（Rust 侧给字符串）----
+    in-out property <string> opacity_text: "65%";
+    in-out property <string> bands_text: "64";
+    in-out property <string> gap_text: "0.20";
+    in-out property <string> sensitivity_text: "1.00";
+    in-out property <string> attack_text: "0.55";
+    in-out property <string> release_text: "0.12";
+    in-out property <string> db_floor_text: "-80 dB";
+    in-out property <string> fft_text: "4096";
+    in-out property <string> silence_text: "-62 dB";
+    in-out property <string> timeout_text: "800 ms";
+
+    callback config_changed();
+    callback reset_defaults();
+    callback autostart_changed();
+    callback tray_changed();
+    callback start_spectrum();
+    callback stop_spectrum();
+    callback preset_selected(string);
+    callback save_preset();
+    callback user_use(string);
+    callback user_delete(string);
+    callback language_changed();
+    callback nav_changed(int);
+    callback dock_bg_changed();
+    callback preview_toggle();
+    callback slow_toggle();
+
+    changed enabled => { root.config_changed(); }
+    changed opacity_value => { root.config_changed(); }
+    changed bands_value => { root.config_changed(); }
+    changed gap_value => { root.config_changed(); }
+    changed color_start => { if !root.color_start_focused { root.config_changed(); } }
+    changed color_end => { if !root.color_end_focused { root.config_changed(); } }
+    changed palette_mode_index => { root.config_changed(); }
+    changed sensitivity_value => { root.config_changed(); }
+    changed attack_value => { root.config_changed(); }
+    changed release_value => { root.config_changed(); }
+    changed db_floor_value => { root.config_changed(); }
+    changed fft_index_value => { root.config_changed(); }
+    changed silence_dbfs_value => { root.config_changed(); }
+    changed silence_timeout_value => { root.config_changed(); }
+    changed peak_cap => { root.config_changed(); }
+    changed peak_hold_value => { root.config_changed(); }
+    changed peak_fall_value => { root.config_changed(); }
+    changed peak_gravity => { root.config_changed(); }
+    changed hide_on_fullscreen => { root.config_changed(); }
+    changed display_mode => { root.config_changed(); }
+
+    VerticalBox {
+        spacing: 0;
+
+        // Treeland 下没有可用的原生标题栏（关掉 winit 的客户端标题栏后窗口完全
+        // 无边框），这里自绘一条：左侧品牌名、右侧最小化 / 最大化 / 关闭，
+        // 空白处可拖动窗口。X11/普通 Wayland 仍用窗管标题栏，不显示这一条。
+        if root.frameless : Rectangle {
+            height: 40px;
+            background: Palette.background;
+
+            // 拖动区在底层：空白处按住拖动移动窗口；右侧按钮位于上层，不会被抢走点击。
+            WindowMoveArea { }
+            Rectangle {
+                y: parent.height - 1px;
+                height: 1px;
+                background: Palette.border;
+            }
+            HorizontalBox {
+                padding-left: 12px;
+                padding-right: 6px;
+                padding-top: 6px;
+                padding-bottom: 7px;
+                spacing: 8px;
+
+                Image {
+                    width: 26px;
+                    height: 26px;
+                    source: @image-url("logo.png");
+                    image-fit: contain;
+                    vertical-alignment: center;
+                }
+                Text {
+                    text: root.s.app_name;
+                    color: Palette.foreground;
+                    font-size: 13px;
+                    font-weight: 700;
+                    vertical-alignment: center;
+                    horizontal-stretch: 1;
+                }
+
+                Rectangle {
+                    width: 36px;
+                    height: 26px;
+                    background: min_btn.has-hover ? Palette.border : transparent;
+                    Text {
+                        text: "−";
+                        color: Palette.foreground;
+                        font-size: 16px;
+                        horizontal-alignment: center;
+                        vertical-alignment: center;
+                    }
+                    min_btn := TouchArea {
+                        mouse-cursor: pointer;
+                        clicked => { root.minimized = true; }
+                    }
+                }
+                Rectangle {
+                    width: 36px;
+                    height: 26px;
+                    background: max_btn.has-hover ? Palette.border : transparent;
+                    Text {
+                        text: root.maximized ? "▣" : "▢";
+                        color: Palette.foreground;
+                        font-size: 14px;
+                        horizontal-alignment: center;
+                        vertical-alignment: center;
+                    }
+                    max_btn := TouchArea {
+                        mouse-cursor: pointer;
+                        clicked => { root.maximized = !root.maximized; }
+                    }
+                }
+                Rectangle {
+                    width: 36px;
+                    height: 26px;
+                    background: close_btn.has-hover ? #c8302a : transparent;
+                    Text {
+                        text: "×";
+                        color: close_btn.has-hover ? #ffffff : Palette.foreground;
+                        font-size: 18px;
+                        horizontal-alignment: center;
+                        vertical-alignment: center;
+                    }
+                    close_btn := TouchArea {
+                        mouse-cursor: pointer;
+                        clicked => { root.close(); }
+                    }
+                }
+            }
+        }
+
+        HorizontalBox {
+            vertical-stretch: 1;
+            padding: 0;
+            spacing: 0;
+
+        // ==================== 左栏：目录 ====================
+        Rectangle {
+            width: 216px;
+            background: Palette.background;
+            VerticalBox {
+                padding: 20px;
+                spacing: 0px;
+
+                HorizontalBox {
+                    spacing: 10px;
+                    // 品牌标识：与「05 关于」名片复用同一份 logo.png，
+                    // 白底 + 细边框保证深浅主题下都有清晰边界（不反色品牌资产）。
+                    Rectangle {
+                        width: 34px; height: 34px;
+                        background: #ffffff;
+                        border-width: 1px; border-color: Palette.border;
+                        Image {
+                            x: 3px; y: 3px; width: 28px; height: 28px;
+                            source: @image-url("logo.png");
+                            image-fit: contain;
+                        }
+                    }
+                    Text { text: root.s.app_name; color: Palette.foreground; font-size: 15px; font-weight: 700; vertical-alignment: center; }
+                }
+                Rectangle { height: 26px; }
+                Text { text: root.s.contents; color: Palette.alternate-foreground; font-size: 9px; }
+                Rectangle { height: 1px; background: Palette.border; }
+
+                Rectangle {
+                    height: 56px;
+                    background: root.panel_index == 0 ? Palette.border : transparent;
+                    HorizontalBox {
+                        padding-left: 8px; spacing: 10px;
+                        Text { text: "01"; color: root.panel_index == 0 ? #c8302a : Palette.alternate-foreground; font-size: 11px; vertical-alignment: center; }
+                        VerticalBox {
+                            spacing: 0px;
+                            Text { text: root.s.nav_presets; color: Palette.foreground; font-size: 16px; font-weight: 700; }
+                            Text { text: "PRESETS · 30"; color: Palette.alternate-foreground; font-size: 9px; }
+                        }
+                    }
+                    TouchArea { clicked => { root.nav_changed(0); } }
+                }
+                Rectangle {
+                    height: 56px;
+                    background: root.panel_index == 1 ? Palette.border : transparent;
+                    HorizontalBox {
+                        padding-left: 8px; spacing: 10px;
+                        Text { text: "02"; color: root.panel_index == 1 ? #c8302a : Palette.alternate-foreground; font-size: 11px; vertical-alignment: center; }
+                        VerticalBox {
+                            spacing: 0px;
+                            Text { text: root.s.nav_tune; color: Palette.foreground; font-size: 16px; font-weight: 700; }
+                            Text { text: "FINE TUNE"; color: Palette.alternate-foreground; font-size: 9px; }
+                        }
+                    }
+                    TouchArea { clicked => { root.nav_changed(1); } }
+                }
+                Rectangle {
+                    height: 56px;
+                    background: root.panel_index == 2 ? Palette.border : transparent;
+                    HorizontalBox {
+                        padding-left: 8px; spacing: 10px;
+                        Text { text: "03"; color: root.panel_index == 2 ? #c8302a : Palette.alternate-foreground; font-size: 11px; vertical-alignment: center; }
+                        VerticalBox {
+                            spacing: 0px;
+                            Text { text: root.s.nav_motion; color: Palette.foreground; font-size: 16px; font-weight: 700; }
+                            Text { text: "MOTION"; color: Palette.alternate-foreground; font-size: 9px; }
+                        }
+                    }
+                    TouchArea { clicked => { root.nav_changed(2); } }
+                }
+                Rectangle {
+                    height: 56px;
+                    background: root.panel_index == 3 ? Palette.border : transparent;
+                    HorizontalBox {
+                        padding-left: 8px; spacing: 10px;
+                        Text { text: "04"; color: root.panel_index == 3 ? #c8302a : Palette.alternate-foreground; font-size: 11px; vertical-alignment: center; }
+                        VerticalBox {
+                            spacing: 0px;
+                            Text { text: root.s.nav_runtime; color: Palette.foreground; font-size: 16px; font-weight: 700; }
+                            Text { text: "RUNTIME"; color: Palette.alternate-foreground; font-size: 9px; }
+                        }
+                    }
+                    TouchArea { clicked => { root.nav_changed(3); } }
+                }
+                Rectangle {
+                    height: 56px;
+                    background: root.panel_index == 4 ? Palette.border : transparent;
+                    HorizontalBox {
+                        padding-left: 8px; spacing: 10px;
+                        Text { text: "05"; color: root.panel_index == 4 ? #c8302a : Palette.alternate-foreground; font-size: 11px; vertical-alignment: center; }
+                        VerticalBox {
+                            spacing: 0px;
+                            Text { text: root.s.nav_about; color: Palette.foreground; font-size: 16px; font-weight: 700; }
+                            Text { text: "ABOUT"; color: Palette.alternate-foreground; font-size: 9px; }
+                        }
+                    }
+                    TouchArea { clicked => { root.nav_changed(4); } }
+                }
+
+                Rectangle { height: 1px; background: Palette.border; }
+                Rectangle { vertical-stretch: 1; }
+                Text { text: root.s.lang_label; color: Palette.alternate-foreground; font-size: 9px; }
+                HorizontalBox {
+                    spacing: 6px;
+                    Button { text: "中文"; clicked => { root.lang_en = false; root.language_changed(); } }
+                    Button { text: "EN"; clicked => { root.lang_en = true; root.language_changed(); } }
+                }
+                Rectangle { height: 10px; }
+                Text { text: "DEEPIN 25 · GPL-3.0"; color: Palette.alternate-foreground; font-size: 9px; }
+            }
+        }
+
+        Rectangle { width: 1px; background: Palette.border; }
+
+        // ==================== 右栏：内容 ====================
+        Rectangle {
+            horizontal-stretch: 1;
+            ScrollView {
+                width: parent.width;
+                height: parent.height;
+                VerticalBox {
+                    padding: 24px;
+                    spacing: 10px;
+
+                    // ---------- 刊头 ----------
+                    Text { text: "DEEPIN · SPECTRUM / SETTINGS"; color: Palette.alternate-foreground; font-size: 9px; }
+                    Text { text: root.s.mast_title; color: Palette.foreground; font-size: 46px; font-weight: 800; }
+                    Text { text: root.s.mast_subtitle; color: Palette.alternate-foreground; font-size: 12px; wrap: word-wrap; }
+                    Rectangle { height: 2px; background: Palette.foreground; }
+
+                    // ---------- 动画预览舞台 ----------
+                    HorizontalBox {
+                        Text { text: root.s.stage_kicker; color: Palette.alternate-foreground; font-size: 9px; horizontal-stretch: 1; }
+                        Button { text: root.preview_dark ? root.s.dock_light : root.s.dock_dark; clicked => { root.preview_dark = !root.preview_dark; root.dock_bg_changed(); } }
+                        Button { text: root.preview_slow ? root.s.slow_off : root.s.slow_on; clicked => { root.preview_slow = !root.preview_slow; root.slow_toggle(); } }
+                        Button { text: root.preview_playing ? root.s.pause : root.s.play; clicked => { root.preview_playing = !root.preview_playing; root.preview_toggle(); } }
+                    }
+                    Rectangle {
+                        height: 104px;
+                        background: root.preview_dark ? #1b1e24 : #d6dae1;
+                        Image {
+                            x: 0; y: 0; width: parent.width; height: parent.height;
+                            source: root.preview_image;
+                            image-fit: fill;
+                        }
+                    }
+                    HorizontalBox {
+                        Text { text: root.s.now_label; color: Palette.alternate-foreground; font-size: 10px; }
+                        Text { text: root.now_name; color: #c8302a; font-size: 14px; font-weight: 700; horizontal-stretch: 1; }
+                        Text { text: root.now_meta; color: Palette.alternate-foreground; font-size: 10px; }
+                    }
+                    Rectangle { height: 1px; background: Palette.border; }
+
+                    // ==================== 01 预置风格（按情绪分类）====================
+                    if root.panel_index == 0 : VerticalBox {
+                        spacing: 14px;
+                        Text { text: "01  /  " + root.s.presets_title; color: Palette.foreground; font-size: 24px; font-weight: 800; }
+                        Text { text: root.s.presets_desc; color: Palette.alternate-foreground; font-size: 11px; wrap: word-wrap; }
+                        Text { text: root.s.group_hint; color: #c8302a; font-size: 11px; wrap: word-wrap; }
+
+                        PresetSection {
+                            title: root.group_titles[0]; sub: root.group_subs[0]; cards: root.group0;
+                            picked(id) => { root.preset_selected(id); }
+                        }
+                        PresetSection {
+                            title: root.group_titles[1]; sub: root.group_subs[1]; cards: root.group1;
+                            picked(id) => { root.preset_selected(id); }
+                        }
+                        PresetSection {
+                            title: root.group_titles[2]; sub: root.group_subs[2]; cards: root.group2;
+                            picked(id) => { root.preset_selected(id); }
+                        }
+                        PresetSection {
+                            title: root.group_titles[3]; sub: root.group_subs[3]; cards: root.group3;
+                            picked(id) => { root.preset_selected(id); }
+                        }
+                        PresetSection {
+                            title: root.group_titles[4]; sub: root.group_subs[4]; cards: root.group4;
+                            picked(id) => { root.preset_selected(id); }
+                        }
+                        PresetSection {
+                            title: root.group_titles[5]; sub: root.group_subs[5]; cards: root.group5;
+                            picked(id) => { root.preset_selected(id); }
+                        }
+                        Text { text: root.preset_status; color: Palette.alternate-foreground; font-size: 11px; wrap: word-wrap; }
+
+                        Rectangle { height: 2px; background: Palette.foreground; }
+                        Text { text: root.s.mine_title; color: Palette.foreground; font-size: 20px; font-weight: 800; }
+                        Text { text: root.s.mine_desc; color: Palette.alternate-foreground; font-size: 11px; wrap: word-wrap; }
+                        for u in root.user_cards : HorizontalBox {
+                            padding: 6px;
+                            spacing: 10px;
+                            Rectangle { width: 8px; height: 8px; background: u.active ? #c8302a : Palette.border; }
+                            Text { text: u.name; color: u.active ? #c8302a : Palette.foreground; font-size: 13px; font-weight: 700; horizontal-stretch: 1; }
+                            Text { text: u.meta; color: Palette.alternate-foreground; font-size: 9px; }
+                            Button { text: root.s.use_btn; clicked => { root.user_use(u.id); } }
+                            Button { text: root.s.delete_btn; clicked => { root.user_delete(u.id); } }
+                        }
+                    }
+
+                    // ==================== 02 微调 ====================
+                    if root.panel_index == 1 : VerticalBox {
+                        spacing: 8px;
+                        Text { text: "02  /  " + root.s.tune_title; color: Palette.foreground; font-size: 24px; font-weight: 800; }
+                        Rectangle { height: 1px; background: Palette.border; }
+                        HorizontalBox {
+                            Text { text: root.s.opacity; width: 130px; color: Palette.control-foreground; font-size: 12px; }
+                            Slider { value <=> root.opacity_value; minimum: 0.05; maximum: 1.0; step: 0.01; horizontal-stretch: 1; }
+                            Text { text: root.opacity_text; width: 62px; color: Palette.foreground; font-size: 12px; horizontal-alignment: right; }
+                        }
+                        HorizontalBox {
+                            Text { text: root.s.bands; width: 130px; color: Palette.control-foreground; font-size: 12px; }
+                            Slider { value <=> root.bands_value; minimum: 16; maximum: 128; step: 1; horizontal-stretch: 1; }
+                            Text { text: root.bands_text; width: 62px; color: Palette.foreground; font-size: 12px; horizontal-alignment: right; }
+                        }
+                        HorizontalBox {
+                            Text { text: root.s.gap; width: 130px; color: Palette.control-foreground; font-size: 12px; }
+                            Slider { value <=> root.gap_value; minimum: 0.0; maximum: 0.9; step: 0.05; horizontal-stretch: 1; }
+                            Text { text: root.gap_text; width: 62px; color: Palette.foreground; font-size: 12px; horizontal-alignment: right; }
+                        }
+                        HorizontalBox {
+                            Text { text: root.s.color_start; width: 130px; color: Palette.control-foreground; font-size: 12px; }
+                            Rectangle { width: 26px; height: 26px; background: root.preview_start; border-color: Palette.border; border-width: 1px; }
+                            LineEdit {
+                                text <=> root.color_start;
+                                horizontal-stretch: 1;
+                                accepted(text) => { root.color_start = text; root.config_changed(); }
+                                changed has-focus => {
+                                    root.color_start_focused = self.has-focus;
+                                    if !self.has-focus { root.config_changed(); }
+                                }
+                            }
+                        }
+                        HorizontalBox {
+                            Text { text: root.s.color_end; width: 130px; color: Palette.control-foreground; font-size: 12px; }
+                            Rectangle { width: 26px; height: 26px; background: root.preview_end; border-color: Palette.border; border-width: 1px; }
+                            LineEdit {
+                                text <=> root.color_end;
+                                horizontal-stretch: 1;
+                                accepted(text) => { root.color_end = text; root.config_changed(); }
+                                changed has-focus => {
+                                    root.color_end_focused = self.has-focus;
+                                    if !self.has-focus { root.config_changed(); }
+                                }
+                            }
+                        }
+
+                        // ---- 多色标 ----
+                        Rectangle { height: 1px; background: Palette.border; }
+                        Text { text: root.s.palette_title; color: Palette.foreground; font-size: 18px; font-weight: 700; }
+                        Text { text: root.s.palette_desc; color: Palette.alternate-foreground; font-size: 11px; wrap: word-wrap; }
+                        HorizontalBox {
+                            Text { text: root.s.palette_mode; width: 130px; color: Palette.control-foreground; font-size: 12px; }
+                            ComboBox {
+                                model: root.palette_mode_labels;
+                                current-index <=> root.palette_mode_index;
+                                width: 220px;
+                                height: 34px;
+                            }
+                            Text { text: root.palette_info; color: Palette.alternate-foreground; font-size: 11px; horizontal-stretch: 1; }
+                        }
+                        HorizontalBox {
+                            Text { text: root.s.palette_stops; width: 130px; color: Palette.control-foreground; font-size: 12px; }
+                            HorizontalBox {
+                                height: 16px; spacing: 0px; padding: 0px; horizontal-stretch: 1;
+                                for c in root.palette_swatch : Rectangle { background: c; horizontal-stretch: 1; }
+                            }
+                        }
+
+                        Rectangle { height: 1px; background: Palette.border; }
+                        Text { text: root.s.fx_title; color: Palette.foreground; font-size: 18px; font-weight: 700; }
+                        Text { text: root.s.fx_desc; color: Palette.alternate-foreground; font-size: 11px; wrap: word-wrap; }
+                        CheckBox { text: root.s.fx_enable; checked <=> root.peak_cap; }
+                        HorizontalBox {
+                            Text { text: root.s.fx_hold; width: 130px; color: Palette.control-foreground; font-size: 12px; }
+                            Slider { value <=> root.peak_hold_value; minimum: 0; maximum: 3000; step: 20; horizontal-stretch: 1; }
+                            Text { text: root.peak_hold_text; width: 62px; color: Palette.foreground; font-size: 12px; horizontal-alignment: right; }
+                        }
+                        HorizontalBox {
+                            Text { text: root.s.fx_fall; width: 130px; color: Palette.control-foreground; font-size: 12px; }
+                            Slider { value <=> root.peak_fall_value; minimum: 0.002; maximum: 0.05; step: 0.002; horizontal-stretch: 1; }
+                            Text { text: root.peak_fall_text; width: 62px; color: Palette.foreground; font-size: 12px; horizontal-alignment: right; }
+                        }
+                        CheckBox { text: root.s.fx_gravity; checked <=> root.peak_gravity; }
+
+                        SaveBar {
+                            value <=> root.save_name;
+                            title: root.s.save_bar_title;
+                            desc: root.s.save_bar_desc;
+                            hint: root.s.save_hint;
+                            button: root.s.save_btn;
+                            save() => { root.save_preset(); }
+                        }
+                    }
+
+                    // ==================== 03 动态 ====================
+                    if root.panel_index == 2 : VerticalBox {
+                        spacing: 8px;
+                        Text { text: "03  /  " + root.s.motion_title; color: Palette.foreground; font-size: 24px; font-weight: 800; }
+                        Rectangle { height: 1px; background: Palette.border; }
+                        HorizontalBox {
+                            Text { text: root.s.sensitivity; width: 130px; color: Palette.control-foreground; font-size: 12px; }
+                            Slider { value <=> root.sensitivity_value; minimum: 0.2; maximum: 3.0; step: 0.05; horizontal-stretch: 1; }
+                            Text { text: root.sensitivity_text; width: 62px; color: Palette.foreground; font-size: 12px; horizontal-alignment: right; }
+                        }
+                        HorizontalBox {
+                            Text { text: root.s.attack; width: 130px; color: Palette.control-foreground; font-size: 12px; }
+                            Slider { value <=> root.attack_value; minimum: 0.0; maximum: 1.0; step: 0.01; horizontal-stretch: 1; }
+                            Text { text: root.attack_text; width: 62px; color: Palette.foreground; font-size: 12px; horizontal-alignment: right; }
+                        }
+                        HorizontalBox {
+                            Text { text: root.s.release; width: 130px; color: Palette.control-foreground; font-size: 12px; }
+                            Slider { value <=> root.release_value; minimum: 0.0; maximum: 1.0; step: 0.01; horizontal-stretch: 1; }
+                            Text { text: root.release_text; width: 62px; color: Palette.foreground; font-size: 12px; horizontal-alignment: right; }
+                        }
+                        HorizontalBox {
+                            Text { text: root.s.db_floor; width: 130px; color: Palette.control-foreground; font-size: 12px; }
+                            Slider { value <=> root.db_floor_value; minimum: -120.0; maximum: -1.0; step: 1.0; horizontal-stretch: 1; }
+                            Text { text: root.db_floor_text; width: 62px; color: Palette.foreground; font-size: 12px; horizontal-alignment: right; }
+                        }
+                        HorizontalBox {
+                            Text { text: root.s.fft; width: 130px; color: Palette.control-foreground; font-size: 12px; }
+                            Slider { value <=> root.fft_index_value; minimum: 0; maximum: 3; step: 1; horizontal-stretch: 1; }
+                            Text { text: root.fft_text; width: 62px; color: Palette.foreground; font-size: 12px; horizontal-alignment: right; }
+                        }
+
+                        SaveBar {
+                            value <=> root.save_name;
+                            title: root.s.save_bar_title;
+                            desc: root.s.save_bar_desc;
+                            hint: root.s.save_hint;
+                            button: root.s.save_btn;
+                            save() => { root.save_preset(); }
+                        }
+                    }
+
+                    // ==================== 04 运行 ====================
+                    if root.panel_index == 3 : VerticalBox {
+                        spacing: 8px;
+                        Text { text: "04  /  " + root.s.runtime_title; color: Palette.foreground; font-size: 24px; font-weight: 800; }
+                        Rectangle { height: 1px; background: Palette.border; }
+                        HorizontalBox {
+                            Rectangle { width: 8px; height: 8px; background: root.daemon_running ? #22c55e : #9aa0a6; }
+                            Text { text: root.daemon_status_text; color: Palette.foreground; font-size: 12px; horizontal-stretch: 1; }
+                            Button { text: root.s.start; enabled: !root.daemon_running; clicked => { root.start_spectrum(); } }
+                            Button { text: root.s.stop; enabled: root.daemon_running; clicked => { root.stop_spectrum(); } }
+                        }
+                        CheckBox { text: root.s.autostart; checked <=> root.autostart; toggled => { root.autostart_changed(); } }
+                        CheckBox { text: root.s.tray; checked <=> root.tray_enabled; toggled => { root.tray_changed(); } }
+                        CheckBox { text: root.s.fullscreen; checked <=> root.hide_on_fullscreen; }
+                        CheckBox { text: root.s.fx_enable; checked <=> root.enabled; }
+                        HorizontalBox {
+                            Text { text: root.s.silence_dbfs; width: 130px; color: Palette.control-foreground; font-size: 12px; }
+                            Slider { value <=> root.silence_dbfs_value; minimum: -100.0; maximum: -1.0; step: 1.0; horizontal-stretch: 1; }
+                            Text { text: root.silence_text; width: 62px; color: Palette.foreground; font-size: 12px; horizontal-alignment: right; }
+                        }
+                        HorizontalBox {
+                            Text { text: root.s.silence_timeout; width: 130px; color: Palette.control-foreground; font-size: 12px; }
+                            Slider { value <=> root.silence_timeout_value; minimum: 0; maximum: 60000; step: 50; horizontal-stretch: 1; }
+                            Text { text: root.timeout_text; width: 62px; color: Palette.foreground; font-size: 12px; horizontal-alignment: right; }
+                        }
+                        HorizontalBox {
+                            Text { text: root.s.runtime_mode_label; width: 130px; color: Palette.control-foreground; font-size: 12px; }
+                            ComboBox {
+                                model: root.mode_labels;
+                                current-index <=> root.display_mode;
+                                width: 220px;
+                                height: 34px;
+                            }
+                            Rectangle { horizontal-stretch: 1; }
+                        }
+                    }
+
+                    // ==================== 05 关于 ====================
+                    if root.panel_index == 4 : VerticalBox {
+                        spacing: 10px;
+                        Text { text: "05  /  " + root.s.about_title; color: Palette.foreground; font-size: 24px; font-weight: 800; }
+                        Rectangle { height: 2px; background: Palette.foreground; }
+
+                        // 名片区：Logo + 软件名 + 版本徽标 + 一句话
+                        HorizontalBox {
+                            spacing: 24px;
+                            Rectangle {
+                                width: 136px; height: 136px;
+                                background: #ffffff;
+                                border-width: 1px; border-color: Palette.border;
+                                Image {
+                                    x: 12px; y: 12px; width: 112px; height: 112px;
+                                    source: @image-url("logo.png");
+                                    image-fit: contain;
+                                }
+                            }
+                            VerticalBox {
+                                spacing: 5px;
+                                Text { text: root.s.app_name; color: Palette.foreground; font-size: 34px; font-weight: 800; }
+                                Text { text: root.s.about_kicker; color: Palette.alternate-foreground; font-size: 10px; }
+                                HorizontalBox {
+                                    spacing: 10px;
+                                    Rectangle {
+                                        width: 84px; height: 24px; background: #c8302a;
+                                        Text {
+                                            text: "v" + root.about_version;
+                                            color: #ffffff; font-size: 12px; font-weight: 700;
+                                            horizontal-alignment: center; vertical-alignment: center;
+                                        }
+                                    }
+                                    Rectangle { horizontal-stretch: 1; }
+                                }
+                                Text { text: root.s.about_tagline; color: Palette.control-foreground; font-size: 12px; wrap: word-wrap; }
+                            }
+                        }
+                        Rectangle { height: 1px; background: Palette.border; }
+
+                        HorizontalBox {
+                            Text { text: root.s.about_author; width: 130px; color: Palette.control-foreground; font-size: 12px; }
+                            Text { text: root.about_author; color: Palette.foreground; font-size: 14px; font-weight: 700; }
+                            Rectangle { horizontal-stretch: 1; }
+                        }
+                        HorizontalBox {
+                            Text { text: root.s.about_email; width: 130px; color: Palette.control-foreground; font-size: 12px; }
+                            LineEdit { text: root.about_email; read-only: true; width: 280px; }
+                            Rectangle { horizontal-stretch: 1; }
+                        }
+                        HorizontalBox {
+                            Text { text: root.s.about_license; width: 130px; color: Palette.control-foreground; font-size: 12px; }
+                            Text { text: "GPL-3.0-only"; color: #c8302a; font-size: 14px; font-weight: 700; }
+                            Rectangle { horizontal-stretch: 1; }
+                        }
+                        HorizontalBox {
+                            Text { text: root.s.about_version; width: 130px; color: Palette.control-foreground; font-size: 12px; }
+                            Text { text: root.about_version; color: Palette.foreground; font-size: 13px; }
+                            Rectangle { horizontal-stretch: 1; }
+                        }
+                        HorizontalBox {
+                            Text { text: root.s.about_stack; width: 130px; color: Palette.control-foreground; font-size: 12px; }
+                            Text { text: "Rust 1.92  ·  Slint 1.18  ·  PulseAudio  ·  FFT  ·  X11 / Wayland"; color: Palette.foreground; font-size: 11px; wrap: word-wrap; }
+                        }
+
+                        Rectangle { height: 2px; background: Palette.foreground; }
+                        Text { text: root.s.about_license_note; color: Palette.alternate-foreground; font-size: 11px; wrap: word-wrap; }
+                        Text { text: root.s.about_license_file; color: Palette.alternate-foreground; font-size: 10px; wrap: word-wrap; }
+                        Text { text: root.s.about_thanks; color: Palette.alternate-foreground; font-size: 10px; wrap: word-wrap; }
+                    }
+
+                    // ---------- 页脚 ----------
+                    Rectangle { height: 1px; background: Palette.border; }
+                    HorizontalBox {
+                        Text { text: root.status_text; color: root.status_error ? #c0392b : Palette.alternate-foreground; font-size: 12px; horizontal-stretch: 1; wrap: word-wrap; }
+                        Button { text: root.s.footer_reset; clicked => { root.reset_defaults(); } }
+                    }
+                    Text { text: root.s.footer_hint; color: Palette.alternate-foreground; font-size: 10px; wrap: word-wrap; }
+                }
+            }
+        }
+        }
+    }
+}

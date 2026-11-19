@@ -1,0 +1,39 @@
+Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
+Upstream-Name: deepin-spectrum
+Upstream-Contact: Feelup <testangel@163.com>
+
+Files: *
+Copyright: 2026 Feelup <testangel@163.com>
+License: GPL-3.0-only
+ This program is free software: you can redistribute it and/or modify
+ it under the terms of the GNU General Public License version 3 as
+ published by the Free Software Foundation, **with no "or later" option**.
+ .
+ This program is distributed in the hope that it will be useful,
+ but WITHOUT ANY WARRANTY; without even the implied warranty of
+ MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+ See the GNU General Public License version 3 for more details.
+ .
+ On Debian systems, the complete text of the GNU General Public
+ License version 3 can be found in "/usr/share/common-licenses/GPL-3".
+ .
+ ★ 为什么是 GPL-3.0-only 而不是 GPL-3.0+：
+ 设置界面使用 Slint 1.18.1，其许可是
+ `GPL-3.0-only OR LicenseRef-Slint-Royalty-free-2.0 OR LicenseRef-Slint-Software-3.0`。
+ Slint 明确禁止把链接它的产物按 "or later" 声明（§11.1 方案 A），因此本项目整体
+ 按 GPL-3.0-only 分发。这是 2026-11-14 的项目决策，改回 GPL-3.0+ 需要先替换掉 Slint。
+
+Files: LICENSE
+Copyright: 2007 Free Software Foundation, Inc.
+License: GPL-3.0-only
+ GNU General Public License version 3 全文，随源码与安装包一同分发。
+
+Files: crates/spectrum-settings-gui/slint/logo.png
+Copyright: 2026 Feelup <testangel@163.com>
+License: GPL-3.0-only
+ 应用 Logo（品红到青的频谱柱），与源码同许可。
+
+Files: crates/spectrum-settings-gui/slint/gui.slint
+Copyright: 2026 Feelup <testangel@163.com>
+License: GPL-3.0-only
+ 界面定义与本项目其它源码同许可。

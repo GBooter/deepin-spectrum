@@ -1,0 +1,53 @@
+[package]
+name = "spectrum-daemon"
+version.workspace = true
+license.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+
+# F84：全项目统一子命令 daemon | settings | doctor，不使用 --settings 标志。
+[[bin]]
+name = "deepin-spectrum"
+path = "src/main.rs"
+
+[lints]
+workspace = true
+
+# 依赖按 feature 递增，默认构建仍不引入窗口系统/音频库：
+#   - 纯逻辑单测            : cargo test -p spectrum-daemon
+#   - 端到端（X11 上屏）    : --features dbus,x11
+#   - 真实音频采集          : --features pulse
+[features]
+default = []
+dbus = ["spectrum-platform/dbus"]
+x11 = ["spectrum-platform/x11"]
+wayland = ["spectrum-platform/wayland", "dbus", "dep:zbus"]
+pulse = ["spectrum-core/capture-pulse"]
+# 发布包用 realfft 的 R2C 后端（比内置复数 FFT 快约 10×），打包脚本显式启用。
+fft-realfft = ["spectrum-core/fft-realfft"]
+tray = ["dep:zbus"]
+
+[dependencies]
+spectrum-core = { path = "../spectrum-core", version = "0.5.8" }
+spectrum-render = { path = "../spectrum-render", version = "0.5.8" }
+spectrum-platform = { path = "../spectrum-platform", version = "0.5.8" }
+# 配置与热重载（零外部依赖的 TOML 子集 + 轮询监视）
+spectrum-settings = { path = "../spectrum-settings", version = "0.5.8" }
+# 托盘走 StatusNotifierItem（D-Bus 服务端），需要 zbus 的 service 侧
+zbus = { version = "6.3.0", default-features = false, features = ["default-rt", "proxy", "service"], optional = true }
+
+[[example]]
+name = "pipeline_probe"
+required-features = ["dbus", "x11"]
+
+[[example]]
+name = "live_music_probe"
+required-features = ["dbus", "x11", "pulse"]
+
+[[example]]
+name = "soak_probe"
+required-features = ["dbus", "x11", "pulse"]
+
+[[example]]
+name = "reconnect_probe"
+required-features = ["pulse"]

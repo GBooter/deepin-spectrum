@@ -1,0 +1,42 @@
+[Unit]
+Description=Deepin 任务栏音频频谱
+Documentation=man:deepin-spectrum(1)
+After=graphical-session.target pulseaudio.service pipewire.service pipewire-pulse.service wireplumber.service
+PartOf=graphical-session.target
+# 瞬态失败（音频服务/合成器刚登录尚未就绪）允许 systemd 静默拉起；
+# 30s 内最多 3 次，持续失败就停下来，避免无限重启和日志刷屏。
+StartLimitIntervalSec=30
+StartLimitBurst=3
+
+[Service]
+Type=simple
+# ★ 登录自启失效根因（2026-11-16 实证）：systemd user 服务不继承图形会话的
+#   DISPLAY，daemon 的 x11rb::connect(None) 直接报 "$DISPLAY variable not set"
+#   → 建窗失败 → Restart=on-failure 反复重启 → 播放音乐也没频谱。
+#   deepin X11 会话固定 :0；Wayland/Treeland 会话由 daemon 的 treeland.socket 兜底
+#   判定，不依赖此变量。daemon 侧另有 DISPLAY 未设置时扫 socket 推断的兜底。
+Environment=DISPLAY=:0
+# ★ 必须 --live：不带它 daemon 用合成纯音（440Hz 恒响），任务是"假频谱"（M75）
+ExecStart=/usr/bin/deepin-spectrum daemon --live
+# 频谱是"锦上添花"：崩了要拉回来，但别无限重启（配置坏了就安静退出）
+Restart=on-failure
+RestartSec=2
+# 退出码 3 = 已有实例在跑（GUI/托盘先启动）；不算失败、也不重启。
+RestartPreventExitStatus=3
+SuccessExitStatus=3
+# 只影响自己，不碰别的服务
+Slice=session.slice
+# 加固：不需要提权、不写系统目录；配置只读（写配置由 GUI 负责）
+NoNewPrivileges=yes
+ProtectSystem=full
+ProtectHome=read-only
+RestrictSUIDSGID=yes
+# ★ 登录自启报 "Read-only file system (os error 30)" 的根因（2026-11-16 真机实证）：
+#   ProtectSystem=full 把 /run/user 也挂成只读，但 daemon 启动第一步必须在
+#   $XDG_RUNTIME_DIR 建单实例锁 + 控制 socket，于是 EROFS 退出、被 Restart 反复拉起。
+#   %t 是 systemd user 单元里 $XDG_RUNTIME_DIR 的标准写法；为它开可写白名单，
+#   既保住其余加固，又让自启能建立控制通道。
+ReadWritePaths=%t
+
+[Install]
+WantedBy=default.target

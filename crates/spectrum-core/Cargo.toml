@@ -1,0 +1,32 @@
+[package]
+name = "spectrum-core"
+version.workspace = true
+license.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+
+[lints]
+workspace = true
+
+# 双后端 + 可选真实采集，默认构建仍是零依赖：
+#   - 开发 / 离线 / CI         : cargo test --workspace
+#   - 打包（realfft FFT 后端） : cargo build --release --features fft-realfft
+#   - 真实音频采集             : cargo run --features capture-pulse --example capture_probe
+#   - 全量验证                 : cargo test --workspace --all-features
+[features]
+default = []
+fft-realfft = ["dep:realfft", "dep:rustfft"]
+capture-pulse = ["dep:libpulse-binding"]
+
+[dependencies]
+realfft = { version = "3.5.1", optional = true }
+rustfft = { version = "6.4.1", optional = true }
+libpulse-binding = { version = "2.30.1", optional = true }
+
+[[example]]
+name = "capture_probe"
+required-features = ["capture-pulse"]
+
+[[example]]
+name = "capture_diag"
+required-features = ["capture-pulse"]

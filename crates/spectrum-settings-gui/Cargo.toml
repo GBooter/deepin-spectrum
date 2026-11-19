@@ -1,0 +1,54 @@
+[package]
+name = "spectrum-settings-gui"
+# 独立 workspace，不能继承主工程的 workspace.package
+version = "0.5.8"
+license = "GPL-3.0-only"
+edition = "2024"
+rust-version = "1.92"
+
+# 与主工程的 workspace lints 保持一致（独立 workspace 无法继承）
+[lints.rust]
+unsafe_op_in_unsafe_fn = "deny"
+missing_docs = "deny"
+unused_qualifications = "deny"
+
+[lints.clippy]
+all = { level = "deny", priority = -1 }
+pedantic = { level = "deny", priority = -1 }
+module_name_repetitions = "allow"
+missing_errors_doc = "allow"
+undocumented_unsafe_blocks = "deny"
+missing_safety_doc = "deny"
+
+# 打包时 .desktop 走这个二进制（F29：只打包设置界面的 .desktop）。
+[[bin]]
+name = "deepin-spectrum-settings"
+path = "src/main.rs"
+
+[lib]
+name = "spectrum_settings_gui"
+path = "src/lib.rs"
+
+# 许可：Slint 1.18 为 `GPL-3.0-only OR 商业`，本项目按 §11.1 方案 A
+# 整体按 **GPL-3.0-only** 分发（见 docs/设置与热重载设计.md §9）。
+#
+# 特性选择（刻意收窄，减小依赖树与编译时间）：
+#   - 不用 backend-default（那会带上 linuxkms，需要 libdrm/libgbm）
+#   - 不用 accessibility（省掉 accesskit 及其一整棵依赖树）
+#   - 保留 femtovg（GPU 渲染，深浅色任务栏上都不糊）
+[dependencies]
+spectrum-core = { path = "../spectrum-core", version = "0.5.8" }
+spectrum-settings = { path = "../spectrum-settings", version = "0.5.8" }
+slint = { version = "1.18", default-features = false, features = [
+    "std",
+    "backend-winit",
+    "renderer-femtovg",
+    "compat-1-2",
+] }
+
+[build-dependencies]
+slint-build = "1.18"
+
+# 独立 workspace（见根 Cargo.toml 的 exclude 注释）：
+# 不与主 workspace 共享 Cargo.lock，避免 Slint 依赖树污染主工程的零依赖基线。
+[workspace]

@@ -1,0 +1,26 @@
+# 隔离开发环境（工具链 + venv）不入库
+/.dev-env/
+**/target/
+**/*.rs.bk
+*.log
+
+# 本机运行产物
+/.cache/
+*.deb
+*.wav
+
+# 发布产物：通过 GitHub Releases 分发，不入库
+/dist/
+/*.tar.gz
+/*.zip
+/*.sha256
+
+# Python 与系统临时文件
+__pycache__/
+*.pyc
+.DS_Store
+*.tmp
+*.bak
+*.orig
+*.rej
+*~

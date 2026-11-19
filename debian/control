@@ -1,0 +1,25 @@
+Source: deepin-spectrum
+Section: utils
+Priority: optional
+Maintainer: Deepin Spectrum Contributors <deepin-spectrum@localhost>
+Build-Depends:
+ debhelper-compat (= 13),
+Standards-Version: 4.6.2
+Rules-Requires-Root: no
+
+Package: deepin-spectrum
+# 不用 amd64 写死：ARM64/LoongArch 等构建机也能出正确的包。
+Architecture: any
+Depends:
+ ${shlibs:Depends},
+ ${misc:Depends},
+Recommends:
+ libxcb1,
+ libx11-6,
+ libwayland-client0,
+ pulseaudio-utils,
+Description: Deepin 任务栏音频频谱
+ 在 Deepin 任务栏上显示系统混音的实时频谱柱。
+ .
+ 独立常驻进程，不修改 dde-shell 源码：PulseAudio 采集 → FFT → 空输入区叠加表面。
+ 参数在 ~/.config/deepin-spectrum/config.toml，改完 250ms 内热生效。

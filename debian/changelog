@@ -1,0 +1,311 @@
+deepin-spectrum (0.5.8) unstable; urgency=medium
+
+  * 改进：设置界面「启动频谱」不再“假成功”。启动后先静默观察 1.5s，
+    未存活则自动重试一次；仍失败才在底部状态栏提示日志末行与日志路径，
+    不弹窗、不反复报错
+  * 改进：运行状态轮询对「运行中 → 未运行」加 1.5s 去抖，systemd 静默重启
+    期间不再闪现「未运行」；启动/停止操作成功后立即更新按钮状态
+  * 改进：systemd 用户单元增加 StartLimitIntervalSec=30 / StartLimitBurst=3，
+    瞬态失败最多静默拉起 3 次，持续失败停止重试，避免无限重启与日志刷屏
+
+ -- Deepin Spectrum Contributors <noreply@example.invalid>  Tue, 17 Nov 2026 21:30:00 +0800
+
+deepin-spectrum (0.5.7) unstable; urgency=high
+
+  * ★ 修复 0.5.6 在 Treeland 下标题栏完全消失：Treeland 只接受
+    xdg-decoration 的 client 模式并不会回 configure 事件，关掉 winit
+    的客户端标题栏后合成器也不补原生标题栏，窗口变成无边框。
+    现改为应用内自绘标题栏：左侧 Logo 与应用名，右侧最小化 / 最大化 /
+    关闭按钮，空白处按住即可拖动窗口，窗口边缘 6px 可缩放；
+    仅在 Treeland 会话显示，X11/普通 Wayland 继续使用窗管标题栏
+  * 保留 0.5.6 的频谱修复：Treeland 下 Wayland 叠加层不再因
+    zwlr_foreign_toplevel_manager_v1 缺少 event_created_child 而 panic
+
+ -- Deepin Spectrum Contributors <noreply@example.invalid>  Tue, 17 Nov 2026 21:00:00 +0800
+
+deepin-spectrum (0.5.6) unstable; urgency=high
+
+  * ★ 修复 Treeland 下频谱完全不启动：Wayland 叠加层绑定
+    zwlr_foreign_toplevel_manager_v1 后没有声明 toplevel 事件的子对象类型，
+    Treeland 立即下发该事件触发 wayland-client panic（Missing
+    event_created_child specialization），叠加层线程死亡、daemon 反复重启；
+    现补上 event_created_child（opcode 0 → handle），真机 Treeland 下
+    synthetic / live 两种音频源均验证可正常上屏
+  * ★ 修复 Treeland 下设置界面出现两条标题栏：合成器原生标题栏之外，
+    winit 又绘制了一条 Adwaita 客户端标题栏（中文标题渲染成方块）；
+    Treeland 会话下设置 no-frame 关闭客户端标题栏，X11/普通 Wayland 不受影响
+  * man page 版本号同步为 0.5.6
+
+ -- Deepin Spectrum Contributors <noreply@example.invalid>  Tue, 17 Nov 2026 20:30:00 +0800
+
+deepin-spectrum (0.5.5) unstable; urgency=medium
+
+  * 修复登录自启第二阶段失效（真机 journal 实证 "Read-only file system
+    (os error 30)" 每 2 秒反复退出）：ProtectSystem=full 把 /run/user 挂成只读，
+    但 daemon 启动第一步要在 $XDG_RUNTIME_DIR 建单实例锁与控制 socket → EROFS。
+    unit 增加 ReadWritePaths=%t 为该目录开可写白名单，保留其余加固
+  * 锁文件创建失败（EROFS / EACCES）时给出可操作诊断提示，指向 ProtectSystem/ReadWritePaths
+
+ -- Deepin Spectrum Contributors <noreply@example.invalid>  Mon, 16 Nov 2026 22:40:00 +0800
+
+deepin-spectrum (0.5.4) unstable; urgency=medium
+
+  * 修复登录自启无效：systemd user 服务不继承图形会话的 DISPLAY，daemon 的
+    x11rb 连接直接报 "$DISPLAY variable not set" → 建窗失败 → 反复重启，表现是
+    勾选自启、重启后播放音乐也没有频谱。双层修复：service unit 显式给
+    DISPLAY=:0（deepin X11 默认），daemon 侧在 DISPLAY 缺失时扫描 /tmp/.X11-unix
+    推断 display 后重连。用 Xvfb 清空 DISPLAY 实证：daemon 推断出 :77 并成功建窗
+  * 文案：「开机自启」改为「登录时自动启动频谱」（en: Start spectrum on login），
+    准确描述“登录桌面后自动拉起频谱服务”的语义
+
+ -- Deepin Spectrum Contributors <noreply@example.invalid>  Mon, 16 Nov 2026 21:55:00 +0800
+
+deepin-spectrum (0.5.3) unstable; urgency=medium
+
+  * 修复：设置界面「运行」页的「开机自启」「在系统托盘显示控制图标」开关此前
+    从未在 Rust 侧注册回调，勾选只改界面、systemd/XDG 自启毫无动作；现补上
+    on_autostart_changed / on_tray_changed，真实调用 systemctl 与托盘启停，失败回滚勾态
+  * 修复：打开设置界面时从 systemd / 托盘进程回填上述开关真实状态，不再每次显示未勾选
+  * 修复：切换预置风格现在只覆盖配色/不透明度/柱数/间隙，保留用户在「微调」「动态」
+    调整的峰值滑块与灵敏度/起音/衰减/FFT 等参数（原行为会一并重置）
+
+ -- Deepin Spectrum Contributors <noreply@example.invalid>  Mon, 16 Nov 2026 21:35:00 +0800
+
+deepin-spectrum (0.5.2) unstable; urgency=medium
+
+  * 统一产品名：启动器 Name / Name[en] 由「任务栏频谱设置 / Taskbar Spectrum
+    Settings」改为「频谱工坊 / Spectrum Atelier」；托盘自启动项、包描述与
+    man page NAME 段一并统一，Comment 保留功能描述
+  * 设置界面左上角红底「频」字方块换为软件 Logo（与关于页共用 logo.png，
+    白底细边框，深浅主题下边界清晰）
+  * man page 版本号 0.2.6 → 0.5.2
+  * 新增 docs/store-listing.md：deepin 应用商店上架文案（一句话介绍 /
+    应用介绍，中英双语，附字数核验与截图建议）
+
+ -- Deepin Spectrum Contributors <noreply@example.invalid>  Sun, 15 Nov 2026 20:50:00 +0800
+
+deepin-spectrum (0.5.1) unstable; urgency=medium
+
+  * ★ 新增「05 关于」页：Logo 名片、软件名与版本徽标、作者 Feelup、
+    邮箱 testangel@163.com（只读框可选中复制）、开源协议、技术栈与致谢；
+    中英双语，版本号直接取自 CARGO_PKG_VERSION
+  * ★ 许可合规：确认全部依赖许可与 GPL-3.0 兼容（29 种唯一许可，
+    无 GPL-2.0-only / MPL 等不兼容项）；7 个 Cargo.toml 补
+    license = "GPL-3.0-only"，新增根目录 LICENSE（GPL-3 全文 674 行），
+    debian/copyright 补 Upstream-Contact 与逐文件版权
+  * 打包：GPL-3 全文安装到 /usr/share/doc/deepin-spectrum/LICENSE.GPL-3，
+    spike-deb.json 新增 D6 断言
+  * Logo：data/deepin-spectrum.png 内嵌进 Slint 资源，二进制自包含
+
+ -- Deepin Spectrum Contributors <noreply@example.invalid>  Sun, 15 Nov 2026 20:15:00 +0800
+
+deepin-spectrum (0.5.0) unstable; urgency=medium
+
+  * ★ 预置库扩到 30 套，按 6 个情绪分类分区展示（欢快 / 平静 / 温暖 /
+    忧伤 / 严肃 / 炫酷），每类 5 张色卡；设置界面不再用筛选标签切族
+  * ★ 新增多色标渲染：visual.palette（3~8 个 #RRGGBB）+ visual.palette_mode
+    = off / across（横向彩虹渐变）/ per_bar（每柱一色）/ vertical（柱内多段）
+    8 套多色预置覆盖三种铺法；渲染器、配置层、热重载差分、动画预览、
+    预置常量、用户方案存储与 CLI 全链路贯通
+  * 兼容性：palette 为空或 mode=off 时逐像素等价于 v0.4.0 双色渐变，
+    有回归单测守护；旧配置无需迁移、不动 CONFIG_VERSION
+  * 修复：设置界面「显示位置」在中文下仍显示英文 visual.mode / FullDock，
+    ComboBox 撑满整行 —— 标签与选项改为随语言切换，框收窄为 220×34px
+  * 修复：预置色卡文字被压糊 —— GridLayout + repeater 的 row/col 在
+    Slint 1.18.1 下不生效，卡片被压成一列；改为分类组件 + 横向布局，
+    卡片高度给足 148px
+  * 改进：「存成我的方案」入口移到 02 微调与 03 动态页底部，调完即可命名保存；
+    01 页保留方案列表（选用 / 删除）并加引导语
+  * CLI：--list-presets 按情绪分类分组显示，多色方案标 ★
+  * 设计资产：presets.json 单一数据源同步到原型，verify_design.py 扩到
+    1394 条断言（含多色合法性、分类数量与全部落地门）
+
+ -- Deepin Spectrum Contributors <noreply@example.invalid>  Sun, 15 Nov 2026 19:45:00 +0800
+
+deepin-spectrum (0.4.0) unstable; urgency=medium
+
+  * ★ 设置界面视觉重构：杂志排版（刊头 / 左侧编号目录 / 4 分区 /
+    20 张预置色卡网格），替换原单页长滚动布局
+  * ★ 新增 B 档动画预览：Rust 侧生成 RGBA 帧 → Slint Image，200ms(5fps)
+    刷新；支持深/浅任务栏底色、暂停、慢放 0.35×；仅在预览开启时生成帧
+  * ★ 新增中英文界面切换：全部 UI 文案集中在 Strings 表，左栏一键切换，
+    偏好持久化到 ~/.config/deepin-spectrum/ui.toml（不动 CONFIG_VERSION）
+  * 新增 preview.rs（像素级 / 物理单测）与 i18n.rs（双表一致性、偏好往返单测）
+  * 设计资产：docs/design/verify_design.py 增加 P1.5 落地断言
+  * 构建：build-deb.sh 架构探测改为多源降级 + 白名单校验，受限沙箱内
+    也能正确产出 amd64 包（此前 dpkg --print-architecture 失败会写出空
+    Architecture 字段，导致 dpkg-deb 组包失败）
+  * 已知限制：动画预览是模拟帧，不接真实音频电平（后续可接 D-Bus）
+
+ -- Deepin Spectrum Contributors <noreply@example.invalid>  Sun, 15 Nov 2026 18:02:00 +0800
+
+deepin-spectrum (0.3.0) unstable; urgency=medium
+
+  * ★ 新增：20 套频谱预置（霓虹赛博 / 单色克制 / 暖色复古 / 自然冷色 /
+    实验款）。设置界面下拉框一键切换，或 `deepin-spectrum settings
+    --apply-preset <id>` 命令行应用；每套只是热生效键的参数组合
+  * ★ 新增：峰值滑块「悬浮缓落」—— 柱顶滑块被声音顶飞、悬停后与柱体
+    分离并缓慢落回；可开关、调悬停时长 / 回落速度、切换重力加速
+    （analyze.peak_fall / analyze.peak_gravity，LiveRebuild 热生效）
+  * ★ 新增：命名保存「我的方案」，一次存外观 + 动态 + 滑块共 14 个值；
+    独立文件 ~/.config/deepin-spectrum/presets/<id>.toml，不动 CONFIG_VERSION
+  * 新增 CLI：--list-presets / --apply-preset / --save-preset / --delete-preset
+  * 修复：apply::diff 补齐 2 个新键，避免热重载「改了没反应」
+  * 兼容性：peak_fall 默认 0.02、peak_gravity 默认 false，与 0.2.6 的
+    硬编码匀速衰减逐帧等价；旧配置无需迁移
+  * 设计资产：docs/design/ 下的可交互原型、UI 设计方案与断言自检（859 条）
+  * 已知限制：设置界面仍为单页控件布局；杂志排版视觉重构与动画预览
+    （B 档自绘）留待下一轮，需真机观感验证
+
+ -- Deepin Spectrum Contributors <noreply@example.invalid>  Sun, 15 Nov 2026 17:13:00 +0800
+
+deepin-spectrum (0.2.6) unstable; urgency=medium
+
+  * ★ 修复：安装后应用菜单出现两个图标（设置 / 托盘）—— 托盘不再单独
+    提供 .desktop 入口，改为设置窗口里的「在系统托盘显示控制图标」开关
+  * 托盘开关默认关闭；勾选时启动托盘进程并写入 XDG 登录自启（重启后
+    仍保留），取消勾选会结束托盘进程并删除自启文件
+  * 托盘状态通过 $XDG_RUNTIME_DIR 的 pid 文件 + /proc/<pid>/cmdline 核对，
+    避免重复启动多个托盘图标
+  * 打包：不再安装 deepin-spectrum-tray.desktop，D3 断言同步
+
+ -- Deepin Spectrum Contributors <noreply@example.invalid>  Sun, 15 Nov 2026 16:06:57 +0800
+
+deepin-spectrum (0.2.5) unstable; urgency=high
+
+  * ★ 修复：设置界面在后台线程执行自启/启动/停止，不再卡住 UI；
+    连点防抖，启动失败时如实显示状态（不再乐观标记为已运行）
+  * ★ 修复：daemon 单实例锁存在 TOCTOU 窗口 —— 改用 flock 串行化，
+    先拿锁再检查/清理残留 socket，避免两个实例同时启动
+  * ★ 修复：TOML 解析缺少嵌套深度限制，深层嵌套可致栈溢出（上限 32 层）
+  * ★ 修复：FFT 空窗/非 2 的幂会越界 panic；FftBackend 构造改为返回
+    Result，窗口长度不匹配时显式报错
+  * 修复：合成测试音改为相位累加，长时间运行不再因相位跳变产生爆音
+  * 修复：X11 上屏复用像素缓冲，每帧不再新分配约 1.5MB
+  * 修复：峰值帽实际渲染（柱顶 2px），visual.peak_cap 从"未实现"转为热生效
+  * 修复：Wayland 复用 D-Bus 的 Logical 订阅结果，减少重复订阅
+  * 修复：pipeline 帧结果复用，减少每帧分配
+  * 加固：systemd 用户单元增加 NoNewPrivileges/ProtectSystem/ProtectHome/
+    RestrictSUIDSGID 与 pipewire 依赖排序
+  * 新增：--duration 上限 7 天、频率范围 1Hz–24kHz、非法值启动即报错
+  * 新增：README、man page、scripts/ci.sh 质量门一键脚本
+  * 打包：build-deb 断言加强（rm 失败即退出、mktemp 校验、man page、
+    maintainer scripts 严格检查）；图标改为带 alpha 的 RGBA
+  * 移除：activate-dev-env.sh 不再导出 RUST_LOG（本版本无日志框架）
+
+ -- Deepin Spectrum Contributors <noreply@example.invalid>  Sun, 15 Nov 2026 21:20:00 +0800
+
+deepin-spectrum (0.2.4) unstable; urgency=high
+
+  * ★ 修复：全屏播放视频时频谱不隐藏 —— 检测到全屏只清一帧就被下一帧
+    画回来；渲染条件统一按 hidden 状态判定，Wayland 增加
+    zwlr_foreign_toplevel_manager_v1 原生全屏检测
+  * ★ 修复：Wayland 缩放硬编码 2 —— 1x/1.5x/3x 屏或运行期改缩放会冻结；
+    改为线程回传实际 scale 与 configure 尺寸，按实际值重建像素缓冲
+  * ★ 修复：写配置会把任意父目录 chmod 0700（--config 指向共享目录时
+    静默改权限，指向 /tmp 直接失败）；只对本次新建的专用目录设权限
+  * ★ 修复：托盘/桌面图标通道顺序与渐变方向错误，重新生成 PNG
+  * ★ 修复：x11 feature 单独编译失败；补齐 9 组 feature 矩阵
+  * 修复：四方向任务栏的 AboveDock 几何、几何兜底链、Wayland 几何去抖
+  * 修复：Pulse 有界最新数据、Wayland 有界帧通道（卡顿时不堆积内存）
+  * 修复：GUI 对未支持模式显式告警、颜色编辑、单实例与写冲突
+  * 修复：锁屏隐藏；systemd 单实例退出码 3 不再触发无限重启
+  * 修复：--duration inf 导致 panic、--synthetic 非有限值、GUI 滑杆范围
+    窄于配置合法范围
+  * 修复：GUI 启动 daemon 透传 --config；托盘增加桌面启动入口
+  * 修复：DockSubscription 部分线程失效自动重建（2s 节流、5 次上限）、
+    NeedsRefresh 主动回读权威矩形
+  * 修复：几何/上屏瞬时错误不再直接退出 daemon（约 6 秒失败预算）
+  * 新增：doctor --json（feature/fft 后端/采样率/配置告警/dock 运行时矩形）
+  * 打包：启用 realfft R2C 后端；build-deb 与 debian/rules feature 列表统一；
+    Architecture 跟随构建机；版本号从 Cargo.toml 单一来源并校验一致性
+  * 已知限制：managed-below 未实现（配置告警并降级 override-redirect）；
+    峰值帽未渲染；两份 PulseCapture 仍并存（预留实现已标注）
+
+ -- Deepin Spectrum Contributors <noreply@example.invalid>  Sun, 15 Nov 2026 14:50:00 +0800
+
+deepin-spectrum (0.2.3) unstable; urgency=high
+
+  * ★ 修复：Treeland 忽略运行期 exclusive_zone 变化，切换
+    「任务栏内 / 任务栏上方」画面仍不动。改为统一 exclusive_zone=-1，
+    用 layer-shell bottom/top margin = 任务栏厚度显式位移（FullDock margin=0）
+  * 0.2.2 的热重载差分已确认生效（日志 改动=[visual.mode]）
+
+ -- Deepin Spectrum Contributors <noreply@example.invalid>  Sun, 15 Nov 2026 12:35:00 +0800
+
+deepin-spectrum (0.2.2) unstable; urgency=high
+
+  * ★ 修复：设置里切换「任务栏上方」不生效 —— `apply::diff` 漏了
+    `visual.mode`，daemon 收到热重载却显示"改动=[]"；现已加入差分
+  * ★ 修复：只切显示位置（尺寸不变）时 overlay 不再等待 configure，
+    继续用当前帧上屏，不会冻住/消失
+  * 设置界面改用「显示位置」下拉框：任务栏内 / 任务栏上方，默认任务栏内
+
+ -- Deepin Spectrum Contributors <noreply@example.invalid>  Sun, 15 Nov 2026 12:20:00 +0800
+
+deepin-spectrum (0.2.1) unstable; urgency=high
+
+  * ★ 修复：Wayland 下频谱跑到任务栏上方 —— FullDock 模式改用
+    `exclusive_zone=-1`，直接覆盖任务栏内部
+  * ★ 新增：设置界面「外观 → 显示在任务栏上方（不覆盖任务栏图标）」，
+    对应 visual.mode=AboveDock；Wayland 热生效，X11 下次启动生效
+  * ★ 修复：设置界面顶部的"第二条标题栏"其实是顶部提示条，
+    已移到底部；窗口顶部只保留合成器原生标题栏
+  * X11 同步支持 AboveDock（窗口几何整体上移一个任务栏高度）
+
+ -- Deepin Spectrum Contributors <noreply@example.invalid>  Sun, 15 Nov 2026 12:05:00 +0800
+
+deepin-spectrum (0.2.0) unstable; urgency=high
+
+  * ★ 新增：Treeland / Wayland 后端 —— zwlr_layer_shell_v1 overlay 层 +
+    wl_shm 软件渲染；Treeland 会话下频谱重新可见
+  * ★ 修复：Treeland 下设置界面顶部两条标题栏（移除应用内重复大标题，
+    保留合成器原生标题栏）
+  * Wayland 几何：轮询 dde-shell 的 geometry/Position；物理缓冲 = 逻辑 × 2，
+    空 wl_region 输入穿透 + KeyboardInteractivity None
+  * Wayland socket 支持绝对路径 / $XDG_RUNTIME_DIR/treeland.socket 兜底，
+    便于 systemd 用户服务启动
+  * 打包启用 wayland feature，依赖 libwayland-client0
+  * 已知限制：Wayland 原生全屏检测仍复用 XWayland 的 EWMH 监视，
+    只覆盖 XWayland 全屏窗口
+
+ -- Deepin Spectrum Contributors <noreply@example.invalid>  Sun, 15 Nov 2026 11:30:00 +0800
+
+deepin-spectrum (0.1.4) unstable; urgency=medium
+
+  * 改进：设置界面「启动频谱 / 停止频谱」按钮状态改成点击后立即切换，
+    状态轮询从 2s 缩短到 500ms，不再有"点完半天没反应"的感觉
+  * 改进：状态文本不再显示 pid，只显示「运行中 / 未运行」
+  * 改进：停止时等待 daemon 真正退出，避免按钮短暂闪回「运行中」
+
+ -- Deepin Spectrum Contributors <noreply@example.invalid>  Sun, 15 Nov 2026 11:05:00 +0800
+
+deepin-spectrum (0.1.3) unstable; urgency=high
+
+  * ★ 修复：点「显示桌面」时频谱短暂消失（约 150~250ms）再出现。
+    OR 叠加窗补声明 `_NET_WM_WINDOW_TYPE_DOCK`——kwin 的显示桌面效果
+    会跳过 DOCK 类型；此前 OR 窗口没有类型，桌面动画会短暂盖住它。
+    30fps 录屏实测：修复前有 5~9 帧空档，修复后 0 帧。
+
+ -- Deepin Spectrum Contributors <noreply@example.invalid>  Sun, 15 Nov 2026 10:55:00 +0800
+
+deepin-spectrum (0.1.2) unstable; urgency=high
+
+  * ★ 修复：0.1.0 升级后旧配置仍是 managed-above，导致「显示桌面」继续隐藏频谱
+    （CONFIG_VERSION 1→2，加载时自动迁移为 override-redirect）
+  * ★ 修复：全屏检测恒为 false —— GetProperty 的 type 传错，
+    全屏播放视频时从未真正隐藏（改为 AtomEnum::ATOM / AtomEnum::WINDOW）
+  * 修复：GUI 已在运行频谱时，再勾「开机自启」会触发 systemd 重复拉起
+  * 改进：「启动频谱」在已运行时直接提示，不再 spawn 第二个实例
+
+ -- Deepin Spectrum Contributors <noreply@example.invalid>  Sun, 15 Nov 2026 10:40:00 +0800
+
+deepin-spectrum (0.1.1) unstable; urgency=high
+
+  * ★ 修复：systemd 用户单元缺 --live（开机自启拉起的是合成纯音假频谱，M75）
+  * ★ 新增：GUI 可直接启动/停止频谱（不必再进终端敲命令）
+  * ★ 修复：点「显示桌面」频谱消失 —— 叠加窗默认改 override-redirect（绕过 WM，F124）
+  * 新增：全屏播放视频时自动隐藏频谱（behavior.hide_on_fullscreen，默认开，可关）
+  * 设置界面新增「频谱运行」卡片与「全屏时隐藏」开关
+
+ -- Deepin Spectrum Contributors <noreply@example.invalid>  Sun, 15 Nov 2026 08:30:00 +0800

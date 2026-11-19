@@ -1,0 +1,5 @@
+[toolchain]
+# F22 / §4.3：edition 2024 需 >=1.85；依赖 MSRV 上界是 Slint 1.18 = 1.92。
+# 钉死 1.92.0 保证可复现；不要用 apt 的 rustc 1.81。
+channel = "1.92.0"
+components = ["rustfmt", "clippy"]

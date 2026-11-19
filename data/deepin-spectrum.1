@@ -1,0 +1,102 @@
+.TH DEEPIN-SPECTRUM 1 "2026-11-17" "deepin-spectrum 0.5.8" "用户命令"
+.SH NAME
+deepin-spectrum \- 频谱工坊，Deepin 任务栏实时音频频谱
+.SH SYNOPSIS
+.B deepin-spectrum
+.I 子命令
+.RI [ 选项 ]
+.SH 描述
+.B deepin-spectrum
+在 Deepin 任务栏上显示系统混音的实时频谱柱。它只读取 PulseAudio/PipeWire
+的 monitor 输出，不新建 sink、不改默认输出、不修改 dde-shell 源码。
+.PP
+配置位于
+.I ~/.config/deepin-spectrum/config.toml
+，修改后约 250ms 内热生效。
+.SH 子命令
+.TP
+.B doctor [--json]
+打印编译期能力、FFT 后端、采样率、配置告警与运行时任务栏几何。
+.B --json
+输出机器可读的 JSON。
+.TP
+.B daemon [选项]
+运行主循环并创建叠加窗。
+.TP
+.B tray
+启动系统托盘遥控器（启动/停止频谱）。
+.TP
+.B settings [动作]
+参数模型与热重载。不带动作时打开图形界面。
+.TP
+.B icon [尺寸]
+向标准输出写原始 RGBA 图标数据。
+.SH DAEMON 选项
+.TP
+.BI \-\-synthetic " 频率"
+用合成纯音代替声卡，单位 Hz（默认 440）。
+.TP
+.B \-\-live
+使用真实 PulseAudio monitor（需编译 pulse feature）。
+.TP
+.BI \-\-duration " 秒"
+运行指定秒数后退出（上限 7 天）。
+.TP
+.BI \-\-hop " 帧数"
+每个 hop 的样本数（默认 1024）。
+.TP
+.BI \-\-config " 文件"
+指定配置文件。
+.SH SETTINGS 动作
+.TP
+.B \-\-print
+打印当前生效配置。
+.TP
+.B \-\-path
+打印配置文件路径。
+.TP
+.B \-\-write-default
+写出带注释的默认模板。
+.TP
+.B \-\-check
+校验配置文件。
+.TP
+.B \-\-explain
+列出每个键的生效范围。
+.TP
+.B \-\-gui
+打开图形界面（可与
+.B \-\-config
+搭配）。
+.SH 文件
+.TP
+.I ~/.config/deepin-spectrum/config.toml
+用户配置。
+.TP
+.I /usr/lib/systemd/user/deepin-spectrum.service
+开机自启的 systemd 用户单元。
+.SH 环境变量
+.TP
+.B XDG_RUNTIME_DIR
+控制通道 socket 与 Wayland socket 的运行时目录。
+.TP
+.B WAYLAND_DISPLAY
+Wayland socket 名称或绝对路径。
+.TP
+.B SPECTRUM_WIDTH, SPECTRUM_HEIGHT
+任务栏几何探测失败时的兜底尺寸。
+.SH 退出状态
+.TP
+.B 0
+正常退出。
+.TP
+.B 3
+已有实例在运行（systemd 单元将其视为成功且不重启）。
+.TP
+.B 1
+参数错误、启动失败或运行时不可恢复错误。
+.SH 参见
+.BR systemctl (1),
+.BR pulseaudio (1)
+.SH 作者
+Deepin Spectrum Contributors

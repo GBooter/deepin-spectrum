@@ -1,0 +1,12 @@
+[Desktop Entry]
+Type=Application
+Name=频谱工坊
+Name[en]=Spectrum Atelier
+Comment=让任务栏跟着声音呼吸 · 实时音频频谱
+Comment[en]=Live audio spectrum for the Deepin dock
+Exec=deepin-spectrum settings
+Icon=deepin-spectrum
+Terminal=false
+Categories=Utility;AudioVideo;
+Keywords=spectrum;audio;visualizer;taskbar;
+X-DDE-Category=utility

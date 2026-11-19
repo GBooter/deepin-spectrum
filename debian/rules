@@ -1,0 +1,35 @@
+#!/usr/bin/make -f
+# 打包规则（dh $@）。
+#
+# 关键约束（F29）：
+#   - **只**安装设置界面的 .desktop（`deepin-spectrum settings`）
+#   - daemon 的开机自启由 systemd user unit 负责，**不**再放一个自启 .desktop
+#   - 图标用 `data/deepin-spectrum.png`（现场生成，见 `deepin-spectrum icon`）
+
+export DEB_BUILD_MAINT_OPTIONS = hardening=+all
+
+%:
+	dh $@
+
+override_dh_auto_build:
+	# 主程序：与 scripts/build-deb.sh 保持**同一份** feature 列表
+	# （含 wayland 与 realfft；两边不一致会产出行为不同的包）。
+	cargo build --release --locked --features dbus,x11,pulse,tray,wayland,fft-realfft
+	# 设置界面（Slint，独立 workspace）
+	cd crates/spectrum-settings-gui && cargo build --release --locked
+
+override_dh_auto_install:
+	install -D -m 0755 target/release/deepin-spectrum debian/deepin-spectrum/usr/bin/deepin-spectrum
+	install -D -m 0755 crates/spectrum-settings-gui/target/release/deepin-spectrum-settings \
+		debian/deepin-spectrum/usr/bin/deepin-spectrum-settings
+	install -D -m 0644 data/deepin-spectrum.desktop \
+		debian/deepin-spectrum/usr/share/applications/deepin-spectrum.desktop
+	# 托盘不单独放入口：由设置窗口里的开关启停。
+	install -D -m 0644 data/deepin-spectrum.png \
+		debian/deepin-spectrum/usr/share/icons/hicolor/256x256/apps/deepin-spectrum.png
+	install -D -m 0644 data/deepin-spectrum-32.png \
+		debian/deepin-spectrum/usr/share/icons/hicolor/32x32/apps/deepin-spectrum.png
+	install -D -m 0644 data/deepin-spectrum.1 \
+		debian/deepin-spectrum/usr/share/man/man1/deepin-spectrum.1
+	install -D -m 0644 data/deepin-spectrum.service \
+		debian/deepin-spectrum/usr/lib/systemd/user/deepin-spectrum.service

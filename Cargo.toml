@@ -1,0 +1,47 @@
+[workspace]
+resolver = "3"
+members = [
+    "crates/spectrum-core",
+    "crates/spectrum-render",
+    "crates/spectrum-platform",
+    "crates/spectrum-daemon",
+    "crates/spectrum-settings",
+]
+# GUI crate **独立成 workspace**：它带 Slint 依赖树（~150 crate），
+# 放进主 workspace 会让"默认构建零外部依赖"这条基线失效
+# （连 Cargo.lock 都会被 Slint 污染，离线构建直接失败）。
+# 构建方式：cd crates/spectrum-settings-gui && cargo build --release
+exclude = ["crates/spectrum-settings-gui"]
+
+[workspace.package]
+version = "0.5.8"
+edition = "2024"
+rust-version = "1.92"
+license = "GPL-3.0-only"
+
+# F119：v1.3 修正的三处质量门问题
+#  ① lint 级别统一用 deny（与 CI 的 `-D warnings` 不冲突）
+#  ② undocumented_unsafe_blocks / missing_safety_doc 属 clippy::restriction，
+#     不在 all/pedantic 里，必须显式列出，否则 EGL/X11/libpulse 的 unsafe 无防线
+#  ③ `RUSTDOCFLAGS="-D warnings" cargo doc` 才是真的零 warning 门
+[workspace.lints.rust]
+unsafe_op_in_unsafe_fn = "deny"
+missing_docs = "deny"
+unused_qualifications = "deny"
+
+[workspace.lints.clippy]
+all = { level = "deny", priority = -1 }
+pedantic = { level = "deny", priority = -1 }
+module_name_repetitions = "allow"
+missing_errors_doc = "allow"
+undocumented_unsafe_blocks = "deny"
+missing_safety_doc = "deny"
+
+[profile.release]
+lto = "fat"
+codegen-units = 1
+panic = "abort"
+strip = true
+
+# 依赖版本表见开发指导文档 §14.2；Spike 通过后再按 crate 逐个引入，
+# 避免此刻就因缺系统 -dev 包而编译失败。

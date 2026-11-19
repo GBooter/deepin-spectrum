@@ -1,0 +1,142 @@
+{
+  "spec": {
+    "icon": "jpg/png, 1:1, 96x96 - 512x512",
+    "screenshots": "jpg/png, <=2MB each, 3-6 images, 3:2 (1050x700 - 1920x1280)"
+  },
+  "target_canvas": [
+    1920,
+    1280
+  ],
+  "size_limit_bytes": 2000000,
+  "icon_redraw_verification": {
+    "max_channel_diff": 1,
+    "avg_channel_diff": 0.87,
+    "compared_pixels": 23508
+  },
+  "icon": {
+    "icon-512.png": {
+      "file": "store-assets/icon-512.png",
+      "format": "PNG",
+      "width": 512,
+      "height": 512,
+      "ratio": 1.0,
+      "bytes": 4332
+    },
+    "alternatives/icon-256.png": {
+      "file": "store-assets/alternatives/icon-256.png",
+      "format": "PNG",
+      "width": 256,
+      "height": 256,
+      "ratio": 1.0,
+      "bytes": 1709
+    },
+    "alternatives/icon-512-white-bg.png": {
+      "file": "store-assets/alternatives/icon-512-white-bg.png",
+      "format": "PNG",
+      "width": 512,
+      "height": 512,
+      "ratio": 1.0,
+      "bytes": 4501
+    },
+    "alternatives/icon-512-centered.png": {
+      "file": "store-assets/alternatives/icon-512-centered.png",
+      "format": "PNG",
+      "width": 512,
+      "height": 512,
+      "ratio": 1.0,
+      "bytes": 4334
+    }
+  },
+  "screenshots": [
+    {
+      "file": "store-assets/screenshots/01-dock-live-spectrum.jpg",
+      "format": "JPEG",
+      "width": 1920,
+      "height": 1280,
+      "ratio": 1.5,
+      "bytes": 949466,
+      "caption": "桌面实拍：任务栏紫→青→绿多色标频谱条",
+      "source": "截图_选择区域_20261115211216.png",
+      "group": "official"
+    },
+    {
+      "file": "store-assets/screenshots/02-preset-library.png",
+      "format": "PNG",
+      "width": 1920,
+      "height": 1280,
+      "ratio": 1.5,
+      "bytes": 291605,
+      "caption": "中文 01 预置风格：30 套方案 / 6 类情绪色卡",
+      "source": "截图_选择区域_20261115202846.png",
+      "group": "official"
+    },
+    {
+      "file": "store-assets/screenshots/03-fine-tune.png",
+      "format": "PNG",
+      "width": 1920,
+      "height": 1280,
+      "ratio": 1.5,
+      "bytes": 226754,
+      "caption": "中文 02 微调：彩虹频谱、多色标与参数滑块",
+      "source": "截图_选择区域_20261115202951.png",
+      "group": "official"
+    },
+    {
+      "file": "store-assets/screenshots/04-motion-save-custom.png",
+      "format": "PNG",
+      "width": 1920,
+      "height": 1280,
+      "ratio": 1.5,
+      "bytes": 247935,
+      "caption": "中文 03 动态：动画参数与命名保存「我的方案」",
+      "source": "截图_选择区域_20261115203023.png",
+      "group": "official"
+    },
+    {
+      "file": "store-assets/screenshots/05-runtime.png",
+      "format": "PNG",
+      "width": 1920,
+      "height": 1280,
+      "ratio": 1.5,
+      "bytes": 256522,
+      "caption": "中文 04 运行：开机自启、静音门限、显示位置",
+      "source": "截图_选择区域_20261115203130.png",
+      "group": "official"
+    },
+    {
+      "file": "store-assets/screenshots/06-english-ui.png",
+      "format": "PNG",
+      "width": 1920,
+      "height": 1280,
+      "ratio": 1.5,
+      "bytes": 324593,
+      "caption": "英文 01 Preset Library：中英双语切换",
+      "source": "截图_选择区域_20261115211417.png",
+      "group": "official"
+    },
+    {
+      "file": "store-assets/alternatives/alt-01-dock-orange.jpg",
+      "format": "JPEG",
+      "width": 1920,
+      "height": 1280,
+      "ratio": 1.5,
+      "bytes": 947589,
+      "caption": "备选：桌面实拍·橙红频谱条",
+      "source": "截图_选择区域_20261115211157.png",
+      "group": "alternate"
+    },
+    {
+      "file": "store-assets/alternatives/alt-02-about.png",
+      "format": "PNG",
+      "width": 1920,
+      "height": 1280,
+      "ratio": 1.5,
+      "bytes": 296642,
+      "caption": "备选：中文 05 关于（品牌 / 作者 / GPL-3.0-only）",
+      "source": "截图_选择区域_20261115203217.png",
+      "group": "alternate"
+    }
+  ],
+  "official_count": 6,
+  "assertions": "ALL PASS"
+}

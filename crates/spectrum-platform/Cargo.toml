@@ -1,0 +1,59 @@
+[package]
+name = "spectrum-platform"
+version.workspace = true
+license.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+
+[lints]
+workspace = true
+
+# 默认构建零外部依赖，能力按 feature 递增：
+#   - 开发 / 离线 / CI : cargo test --workspace
+#   - 任务栏几何信号   : --features dbus
+#   - 叠加窗口         : --features x11
+#   - 完整叠加层       : --features dbus,x11
+#   - 全量验证         : cargo test --workspace --all-features
+[features]
+default = []
+dbus = ["dep:zbus"]
+x11 = ["dep:x11rb"]
+wayland = ["dep:smithay-client-toolkit", "dep:wayland-protocols-wlr"]
+
+[dependencies]
+spectrum-core = { path = "../spectrum-core", version = "0.5.8" }
+zbus = { version = "6.3.0", optional = true, default-features = false, features = [
+    "proxy",
+    "default-rt",
+] }
+# M6：x11rb 0.14 的 present 必须配 dri3，否则 E0432；shape 提供 XShape 输入区（F77）。
+x11rb = { version = "0.14.0", optional = true, default-features = false, features = [
+    "allow-unsafe-code",
+    "shape",
+] }
+# Treeland / Wayland 叠加层：layer-shell + SHM 软件渲染。
+# 只启用 calloop 集成，不引入 xkbcommon（本后端不接收键盘输入）。
+smithay-client-toolkit = { version = "0.19.2", optional = true, default-features = false, features = [
+    "calloop",
+] }
+# 原生 Wayland 全屏检测：zwlr_foreign_toplevel_manager_v1（Treeland 已导出 v3）。
+wayland-protocols-wlr = { version = "0.3.12", optional = true, features = ["client"] }
+
+[dev-dependencies]
+spectrum-render = { path = "../spectrum-render", version = "0.5.8" }
+
+[[example]]
+name = "dock_signal_probe"
+required-features = ["dbus"]
+
+[[example]]
+name = "overlay_follow_probe"
+required-features = ["dbus", "x11"]
+
+[[example]]
+name = "render_probe"
+required-features = ["dbus", "x11"]
+
+[[example]]
+name = "wayland_layer_probe"
+required-features = ["wayland"]

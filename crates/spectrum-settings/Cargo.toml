@@ -1,0 +1,32 @@
+[package]
+name = "spectrum-settings"
+version.workspace = true
+license.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+# 本 crate **不产出二进制**（命令行入口统一走 `deepin-spectrum settings`；
+# 图形界面在独立 crate `spectrum-settings-gui`）。
+autobins = false
+
+[lints]
+workspace = true
+
+# 库形态：daemon 必须复用同一套「读 → 校验 → 差分 → 应用」逻辑，
+# 不能在二进制里再写一遍（两份实现迟早分叉，热重载就会"CLI 显示一套、画面另一套"）。
+#
+# `autobins = false`：本 crate **不产出二进制**。
+# 命令行入口统一走 `deepin-spectrum settings`（F84）；
+# 图形界面在独立 crate `spectrum-settings-gui`（二进制名 `deepin-spectrum-settings`）。
+[lib]
+name = "spectrum_settings"
+path = "src/lib.rs"
+
+# 配置层刻意**不引入** toml / serde / notify：
+#   - 离线环境新增依赖树不可控（toml 0.9 需 winnow + serde_spanned + indexmap 等 5+ crate）
+#   - 与本项目「默认构建零外部依赖」原则一致（见 spectrum-core crate 文档）
+#   - 真正要解析的只有 1 层 section + 标量 + 字符串数组，子集解析器足够，
+#     且用「截断文件 / 畸形输入永不 panic」用例兜底
+# 取舍与放弃项见 docs/设置与热重载设计.md §2。
+[dependencies]
+spectrum-core = { path = "../spectrum-core", version = "0.5.8" }
+spectrum-render = { path = "../spectrum-render", version = "0.5.8" }
