@@ -1,11 +1,11 @@
-# deepin Taskbar Audio Spectrum
+# deepin Taskbar Audio Spectrum (Spectrum Atelier)
 
 **English** · [简体中文](README.md)
 
 ![License](https://img.shields.io/badge/license-GPL--3.0--only-blue)
 ![Platform](https://img.shields.io/badge/platform-deepin%2025-2f6fed)
 ![Rust](https://img.shields.io/badge/rust-1.92-orange)
-![Version](https://img.shields.io/badge/version-0.5.8-green)
+![Release](https://img.shields.io/github/v/release/GBooter/deepin-spectrum)
 
 A live audio spectrum rendered on the Deepin 25 taskbar, working on both
 Treeland/Wayland and X11. It runs as a standalone daemon that taps the
@@ -40,6 +40,12 @@ English UI:
 
 ![English UI](store-assets/screenshots/06-english-ui.png)
 
+## Requirements
+
+- Deepin 25 with a Treeland/Wayland or X11 session
+- PulseAudio or PipeWire (reads the monitor stream of the default output)
+- The current release provides an `amd64` package; for other architectures run `scripts/build-deb.sh` on that machine
+
 ## Install
 
 Download the latest `.deb` from [Releases](../../releases):
@@ -48,7 +54,7 @@ Download the latest `.deb` from [Releases](../../releases):
 sudo apt install ./deepin-spectrum_0.5.8_amd64.deb
 ```
 
-Then open "deepin Spectrum Settings" from the app menu, or run:
+Then open "Spectrum Atelier" from the app menu, or run:
 
 ```bash
 deepin-spectrum-settings
@@ -138,7 +144,7 @@ Artifacts are written to `dist/`:
 - structured evidence in `docs/spike-deb.json`
 
 The version is read from `Cargo.toml`; packaging aborts if the GUI crate or
-`debian/changelog` disagree. Eleven assertions run after assembly, including a
+`debian/changelog` disagree. Twelve assertions run after assembly, including a
 `doctor` check of compiled features and the package file list.
 
 ## Quality gates

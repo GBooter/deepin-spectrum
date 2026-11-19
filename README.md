@@ -1,11 +1,11 @@
-# deepin 任务栏音频频谱插件
+# deepin 任务栏音频频谱插件（频谱工坊）
 
 [English](README.en.md) · **简体中文**
 
 ![License](https://img.shields.io/badge/license-GPL--3.0--only-blue)
 ![Platform](https://img.shields.io/badge/platform-deepin%2025-2f6fed)
 ![Rust](https://img.shields.io/badge/rust-1.92-orange)
-![Version](https://img.shields.io/badge/version-0.5.8-green)
+![Release](https://img.shields.io/github/v/release/GBooter/deepin-spectrum)
 
 在 Deepin 25（Treeland/Wayland 或 X11）任务栏上显示系统混音的实时频谱柱。
 独立常驻进程，直接读取 PulseAudio/PipeWire monitor，不修改 dde-shell 源码、
@@ -39,6 +39,12 @@
 
 ![English UI](store-assets/screenshots/06-english-ui.png)
 
+## 运行要求
+
+- Deepin 25，会话为 Treeland/Wayland 或 X11
+- PulseAudio 或 PipeWire（读取默认输出的 monitor 流）
+- 当前 Release 提供 `amd64` 包；其他架构可在对应机器上执行 `scripts/build-deb.sh` 自行构建
+
 ## 安装
 
 从 [Releases](../../releases) 下载最新的 deb 包：
@@ -47,7 +53,7 @@
 sudo apt install ./deepin-spectrum_0.5.8_amd64.deb
 ```
 
-安装后从应用菜单打开「deepin 频谱设置」，或直接运行：
+安装后从应用菜单打开「频谱工坊」（英文名 Spectrum Atelier），或直接运行：
 
 ```bash
 deepin-spectrum-settings
@@ -129,7 +135,7 @@ bash scripts/build-deb.sh
 - 结构化证据 `docs/spike-deb.json`
 
 版本取自 `Cargo.toml`，打包前会校验 GUI crate 与 `debian/changelog` 三处一致，不一致直接中止。
-组包后会执行 11 项断言，含 `doctor` 逐项核对已编译 feature 与关键文件清单。
+组包后会执行 12 项断言，含 `doctor` 逐项核对已编译 feature 与关键文件清单。
 
 ## 质量门
 
