@@ -37,7 +37,14 @@ export CARGO_HOME="$ROOT/.dev-env/cargo"
 export PATH="$ROOT/.dev-env/rustup/toolchains/1.92.0-x86_64-unknown-linux-gnu/bin:$PATH"
 export TMPDIR="$ROOT/.dev-env/tmp"
 export CARGO_NET_OFFLINE=true
-mkdir -p "$TMPDIR" dist docs
+# 产物目录 / 证据文件可被外部覆盖：UOS 20 兼容包由 scripts/build-deb-uos20.sh
+# 复用本脚本在 glibc 2.28 容器里产出，不能覆盖 deepin 25 的产物与证据。
+DIST_DIR="${DIST_DIR:-$ROOT/dist}"
+SPIKE_JSON="${SPIKE_JSON:-$ROOT/docs/spike-deb.json}"
+# 容器内构建会把 CARGO_TARGET_DIR 指到独立目录，避免与宿主的 glibc 2.38 产物混用。
+MAIN_TARGET_DIR="${CARGO_TARGET_DIR:-$ROOT/target}"
+GUI_TARGET_DIR="${CARGO_TARGET_DIR:-$ROOT/crates/spectrum-settings-gui/target}"
+mkdir -p "$TMPDIR" "$DIST_DIR" "$(dirname "$SPIKE_JSON")"
 
 PKG_NAME="deepin-spectrum"
 # 版本单一来源：主 workspace 的 `[workspace.package] version`（GUI crate 与 changelog 同步跟它）。
@@ -92,7 +99,7 @@ case "$PKG_ARCH" in
 esac
 echo "  目标架构: $PKG_ARCH  (版本 $PKG_VERSION)"
 TREE="$ROOT/.dev-env/deb-tree"
-OUT="$ROOT/dist/${PKG_NAME}_${PKG_VERSION}_${PKG_ARCH}.deb"
+OUT="$DIST_DIR/${PKG_NAME}_${PKG_VERSION}_${PKG_ARCH}${PKG_FILE_TAG:-}.deb"
 
 echo "== 1/4 构建两个 release 二进制 =="
 # ★ 主程序必须带全 feature：不带的话 X11/Pulse/托盘/D-Bus 全都"未编译"，
@@ -105,9 +112,9 @@ cargo build --release --offline --features dbus,x11,pulse,tray,wayland,fft-realf
     cd "$ROOT/crates/spectrum-settings-gui" || exit 1
     cargo build --release --offline || exit 1
 ) || exit 1
-GUI_BIN="$ROOT/crates/spectrum-settings-gui/target/release/deepin-spectrum-settings"
+GUI_BIN="$GUI_TARGET_DIR/release/deepin-spectrum-settings"
 [[ -x "$GUI_BIN" ]] || { echo "设置界面二进制缺失：$GUI_BIN" >&2; exit 1; }
-MAIN_BIN="$ROOT/target/release/deepin-spectrum"
+MAIN_BIN="$MAIN_TARGET_DIR/release/deepin-spectrum"
 [[ -x "$MAIN_BIN" ]] || { echo "主程序二进制缺失" >&2; exit 1; }
 
 echo "== 2/4 组装包目录 =="
@@ -196,14 +203,16 @@ chmod +x "$VERIFY_BIN" 2>/dev/null || true
 dpkg-deb --fsys-tarfile "$OUT" | tar -xO ./usr/share/doc/$PKG_NAME/copyright > "$VERIFY_COPYRIGHT" 2>/dev/null
 dpkg-deb --info "$OUT" > .dev-env/deb-info.txt 2>&1
 dpkg-deb --contents "$OUT" > .dev-env/deb-contents.txt 2>&1
-sha256sum "$OUT" > "$OUT.sha256"
+# 摘要里只写文件名：容器内构建时 $OUT 是 /src/dist/...，写绝对路径会让
+# 宿主机上的 `sha256sum -c` 找不到文件。
+( cd "$DIST_DIR" && sha256sum "$(basename "$OUT")" ) > "$OUT.sha256"
 SIZE=$(stat -c%s "$OUT")
 SIZE_MB=$(( SIZE / 1024 / 1024 ))
 echo "  包大小: ${SIZE_MB} MB"
 echo "  内容清单见 .dev-env/deb-contents.txt"
 
 python3 - "$OUT" "$SIZE" "$MAIN_LIBS" "$GUI_LIBS" "$PKG_NAME" "$PKG_VERSION" \
-    "$VERIFY_BIN" "$VERIFY_COPYRIGHT" <<'PY'
+    "$VERIFY_BIN" "$VERIFY_COPYRIGHT" "$SPIKE_JSON" <<'PY'
 import json
 import subprocess
 import sys
@@ -211,8 +220,8 @@ from pathlib import Path
 
 # M78：PKG_NAME/PKG_VERSION 是 bash 变量，heredoc 里拿不到——必须经 argv 传入。
 # （上一版直接在 python 里引用，NameError 让证据脚本静默用旧 JSON，D2 假 FAIL。）
-out, size, main_libs, gui_libs, pkg_name, pkg_version, verify_bin, verify_copyright = (
-    sys.argv[1:9]
+out, size, main_libs, gui_libs, pkg_name, pkg_version, verify_bin, verify_copyright, spike_json = (
+    sys.argv[1:10]
 )
 checks = []
 
@@ -306,7 +315,7 @@ report = {
     "gui_libs": gui_libs.split(),
     "checks": checks,
 }
-Path("docs/spike-deb.json").write_text(
+Path(spike_json).write_text(
     json.dumps(report, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
 )
 print(json.dumps(report, ensure_ascii=False, indent=2))

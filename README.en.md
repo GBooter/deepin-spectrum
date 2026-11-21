@@ -46,12 +46,39 @@ English UI:
 - PulseAudio or PipeWire (reads the monitor stream of the default output)
 - The current release provides an `amd64` package; for other architectures run `scripts/build-deb.sh` on that machine
 
-## Install
+### Which of the two packages?
 
-Download the latest `.deb` from [Releases](../../releases):
+Each release ships two `amd64` packages:
+
+| System | Package | Notes |
+|---|---|---|
+| deepin 25 (glibc ≥ 2.29) | `deepin-spectrum_<version>_amd64.deb` | built natively on deepin 25 |
+| UOS 20 / Debian 10 (glibc 2.28) | `deepin-spectrum_<version>_amd64_uos20.deb` | built in a glibc 2.28 container; highest symbol is `GLIBC_2.28` |
+
+One package cannot serve both: binaries built on deepin 25 reference `GLIBC_2.29 ~ GLIBC_2.34`,
+while UOS 20 only has glibc 2.28 and fails with `version 'GLIBC_2.34' not found`. glibc is not
+backward compatible in that direction, so the package must be rebuilt against the oldest target glibc.
+
+Build the UOS 20 package yourself:
 
 ```bash
+bash scripts/build-deb-uos20.sh
+```
+
+It compiles and packages inside a Debian 10 container (glibc 2.28, same base as UOS 20), writes
+`dist/uos20/deepin-spectrum_<version>_amd64_uos20.deb`, and verifies the highest required symbol is
+`GLIBC_2.28`. Requires podman and the project's offline toolchain (`.dev-env/`).
+
+## Install
+
+Download the `.deb` matching your system from [Releases](../../releases):
+
+```bash
+# deepin 25
 sudo apt install ./deepin-spectrum_0.5.8_amd64.deb
+
+# UOS 20 / Debian 10
+sudo apt install ./deepin-spectrum_0.5.8_amd64_uos20.deb
 ```
 
 Then open "Spectrum Atelier" from the app menu, or run:

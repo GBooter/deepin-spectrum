@@ -45,12 +45,39 @@
 - PulseAudio 或 PipeWire（读取默认输出的 monitor 流）
 - 当前 Release 提供 `amd64` 包；其他架构可在对应机器上执行 `scripts/build-deb.sh` 自行构建
 
-## 安装
+### 两个安装包怎么选
 
-从 [Releases](../../releases) 下载最新的 deb 包：
+Release 同时提供两个 `amd64` 包，按系统选择：
+
+| 系统 | 安装包 | 说明 |
+|---|---|---|
+| deepin 25（glibc ≥ 2.29） | `deepin-spectrum_<版本>_amd64.deb` | 在 deepin 25 上原生编译 |
+| UOS 20 / Debian 10（glibc 2.28） | `deepin-spectrum_<版本>_amd64_uos20.deb` | 在 glibc 2.28 容器中编译，符号上限 `GLIBC_2.28` |
+
+不能共用一个包：deepin 25 编译出的二进制带 `GLIBC_2.29 ~ GLIBC_2.34` 符号，
+而 UOS 20 的 glibc 只有 2.28，运行时报 `version 'GLIBC_2.34' not found`。
+二进制无法向下兼容老 glibc，只能按目标系统的最低 glibc 重新编译。
+
+自行构建 UOS 20 兼容包：
 
 ```bash
+bash scripts/build-deb-uos20.sh
+```
+
+脚本会在 Debian 10 容器（glibc 2.28，与 UOS 20 同源）里重新编译并打包，
+产物为 `dist/uos20/deepin-spectrum_<版本>_amd64_uos20.deb`，并自动校验符号上限不超过 `GLIBC_2.28`。
+需要 podman 和项目已有的离线工具链（`.dev-env/`）。
+
+## 安装
+
+从 [Releases](../../releases) 下载对应系统的 deb 包：
+
+```bash
+# deepin 25
 sudo apt install ./deepin-spectrum_0.5.8_amd64.deb
+
+# UOS 20 / Debian 10
+sudo apt install ./deepin-spectrum_0.5.8_amd64_uos20.deb
 ```
 
 安装后从应用菜单打开「频谱工坊」（英文名 Spectrum Atelier），或直接运行：

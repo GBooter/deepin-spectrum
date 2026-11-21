@@ -1,0 +1,136 @@
+{
+  "feature": "deb-package",
+  "verdict": "PASS",
+  "package": "/src/dist/uos20/deepin-spectrum_0.5.8_amd64_uos20.deb",
+  "size_bytes": 7820496,
+  "main_libs": [
+    "/lib64/ld-linux-x86-64.so.2",
+    "libFLAC.so.8",
+    "libICE.so.6",
+    "libSM.so.6",
+    "libX11-xcb.so.1",
+    "libX11.so.6",
+    "libXau.so.6",
+    "libXdmcp.so.6",
+    "libXext.so.6",
+    "libXi.so.6",
+    "libXtst.so.6",
+    "libasyncns.so.0",
+    "libbsd.so.0",
+    "libc.so.6",
+    "libcap.so.2",
+    "libdbus-1.so.3",
+    "libdl.so.2",
+    "libgcc_s.so.1",
+    "libgcrypt.so.20",
+    "libgpg-error.so.0",
+    "liblz4.so.1",
+    "liblzma.so.5",
+    "libm.so.6",
+    "libnsl.so.1",
+    "libogg.so.0",
+    "libpthread.so.0",
+    "libpulse.so.0",
+    "libpulsecommon-12.2.so",
+    "libresolv.so.2",
+    "librt.so.1",
+    "libsndfile.so.1",
+    "libsystemd.so.0",
+    "libuuid.so.1",
+    "libvorbis.so.0",
+    "libvorbisenc.so.2",
+    "libwrap.so.0",
+    "libxcb.so.1",
+    "linux-vdso.so.1"
+  ],
+  "gui_libs": [
+    "/lib64/ld-linux-x86-64.so.2",
+    "libc.so.6",
+    "libdl.so.2",
+    "libexpat.so.1",
+    "libfontconfig.so.1",
+    "libfreetype.so.6",
+    "libgcc_s.so.1",
+    "libm.so.6",
+    "libpng16.so.16",
+    "libpthread.so.0",
+    "librt.so.1",
+    "libuuid.so.1",
+    "libz.so.1",
+    "linux-vdso.so.1"
+  ],
+  "checks": [
+    {
+      "id": "D1",
+      "desc": "包已生成",
+      "pass": true,
+      "detail": "/src/dist/uos20/deepin-spectrum_0.5.8_amd64_uos20.deb"
+    },
+    {
+      "id": "D6",
+      "desc": "GPL-3 全文随包分发",
+      "pass": true,
+      "detail": "LICENSE 共 35149 字符"
+    },
+    {
+      "id": "D2",
+      "desc": "控制信息含包名与版本",
+      "pass": true,
+      "detail": " new Debian package, version 2.0."
+    },
+    {
+      "id": "D2c",
+      "desc": "doctor 确认已编译：采集 pulse",
+      "pass": true,
+      "detail": "capture          : pulse（已编译）"
+    },
+    {
+      "id": "D2p",
+      "desc": "doctor 确认已编译：X11 上屏",
+      "pass": true,
+      "detail": "presenter        : x11（depth-32 叠加窗 + 空输入区）"
+    },
+    {
+      "id": "D2d",
+      "desc": "doctor 确认已编译：D-Bus 跟随",
+      "pass": true,
+      "detail": "dock follow      : dbus（Wayland 轮询 geometry；X11 订阅 FrontendWindowRectChanged）"
+    },
+    {
+      "id": "D2w",
+      "desc": "doctor 确认已编译：Wayland 上屏",
+      "pass": true,
+      "detail": "presenter(wl)    : wayland（zwlr_layer_shell_v1 + SHM）"
+    },
+    {
+      "id": "D2t",
+      "desc": "doctor 确认已编译：托盘",
+      "pass": true,
+      "detail": "tray             : tray（StatusNotifierItem + DBusMenu）"
+    },
+    {
+      "id": "D2f",
+      "desc": "doctor 确认已编译：realfft FFT 后端",
+      "pass": true,
+      "detail": "fft backend      : realfft-3.5.1-r2c"
+    },
+    {
+      "id": "D3",
+      "desc": "关键文件都在包里",
+      "pass": true,
+      "detail": "全部就位"
+    },
+    {
+      "id": "D4",
+      "desc": "deb 无 maintainer 脚本（安装时不做任何系统动作）",
+      "pass": true,
+      "detail": "no maintainer scripts"
+    },
+    {
+      "id": "D5",
+      "desc": "许可文件正文是 GPL-3.0-only",
+      "pass": true,
+      "detail": "copyright 正文包含 GPL-3.0-only"
+    }
+  ]
+}
