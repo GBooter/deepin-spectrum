@@ -27,3 +27,6 @@ __pycache__/
 
 # 个人工作记忆（本地）
 /.workbuddy/
+
+# 本地操作模板，不属于项目内容
+/docs/github-upload-prompt.md
