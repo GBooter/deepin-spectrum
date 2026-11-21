@@ -3883,15 +3883,15 @@ dependencies = [
 
 [[package]]
 name = "spectrum-core"
-version = "0.5.8"
+version = "0.5.10"
 
 [[package]]
 name = "spectrum-render"
-version = "0.5.8"
+version = "0.5.10"
 
 [[package]]
 name = "spectrum-settings"
-version = "0.5.8"
+version = "0.5.10"
 dependencies = [
  "spectrum-core",
  "spectrum-render",
@@ -3899,7 +3899,7 @@ dependencies = [
 
 [[package]]
 name = "spectrum-settings-gui"
-version = "0.5.8"
+version = "0.5.10"
 dependencies = [
  "slint",
  "slint-build",

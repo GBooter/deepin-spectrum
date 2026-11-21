@@ -1,3 +1,20 @@
+deepin-spectrum (0.5.10) unstable; urgency=medium
+
+  * 修复：任务栏上方模式下，频谱底部与任务栏之间那条"密集点状黑线"。
+    根因是任务栏自带的顶端深色边线（1.75 倍缩放下占 2 个物理行）——
+    0.5.9 的柱底渐隐反而让它更清楚。现在窗口向下压 1px 把它盖住，
+    并在渲染层把最底部 2 行连柱间隙一并填满柱底色，彻底消除该缝。
+
+ -- deepin-spectrum maintainers <maintainers@example.invalid>  Sat, 21 Nov 2026 21:36:00 +0800
+
+deepin-spectrum (0.5.9) unstable; urgency=medium
+
+  * 改进：频谱柱底部与任务栏交界处不再出现近黑色硬边与密集亮点。
+    柱底 3px 的 alpha 线性递减，让柱体柔和融入任务栏；该渐隐仅在
+    生产配置路径启用，渲染层的默认像素行为与既有像素证据保持不变
+
+ -- Deepin Spectrum Contributors <noreply@example.invalid>  Sat, 21 Nov 2026 20:07:00 +0800
+
 deepin-spectrum (0.5.8) unstable; urgency=medium
 
   * 改进：设置界面「启动频谱」不再“假成功”。启动后先静默观察 1.5s，

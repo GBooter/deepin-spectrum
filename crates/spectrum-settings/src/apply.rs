@@ -10,7 +10,7 @@
 //! [`diff`] 把"改了什么"翻译成键名列表，日志与证据脚本都靠它断言。
 
 use spectrum_core::analyzer::AnalyzerConfig;
-use spectrum_core::config::Config;
+use spectrum_core::config::{Config, VisualMode};
 use spectrum_render::{PaletteMode, RenderStyle};
 
 /// 一次配置变更实际需要应用的运行时参数。
@@ -63,12 +63,39 @@ fn gap_of(ratio: f32) -> u16 {
     px.clamp(0.0, 8.0) as u16
 }
 
+/// 柱底渐隐高度（物理像素）。
+///
+/// 生产路径统一启用：柱底 3px 的 alpha 线性递减，消除半透明柱底压在
+/// 深色任务栏上被合成成近黑硬边、间隙处呈密集亮点的问题。
+/// 这是渲染层的观感修复，不引入新的配置项（不影响配置 schema 与 diff）。
+pub const BOTTOM_FADE_PX: u8 = 3;
+
+/// 「任务栏上方」模式下遮盖任务栏接缝的行数（物理像素）。
+///
+/// 任务栏自己会在顶端画一条深色边线（浅色壁纸下尤其明显），
+/// 而 `AboveDock` 的窗口底边正好压在这条线上：柱间隙是透明的，
+/// 于是那条线从缝隙里透出来，看起来就是"密集点状黑线"。
+/// 这里把窗口最底部两行**跨柱间隙填满柱底色**，把它盖住。
+pub const SEAM_COVER_PX: u16 = 2;
+
 /// 由配置算出运行时参数。
 #[must_use]
 pub fn plan(cfg: &Config) -> ApplyPlan {
     let mut style = RenderStyle::new();
     style.gap_px = gap_of(cfg.visual.bar_gap_ratio);
     style.alpha = alpha_of(cfg.visual.opacity);
+    // 两种模式各有各的"底边"处理方式，不能同时开：
+    // - 覆盖模式（InsideDock 等）：柱体压在任务栏上，柱底渐隐融入，
+    //   若改成不透明反而会糊住任务栏内容；
+    // - 任务栏上方模式：窗口底边贴着任务栏顶边的深色线，
+    //   渐隐会把那条线暴露得更清楚，所以改成"跨间隙覆盖"。
+    if cfg.visual.mode == VisualMode::AboveDock {
+        style.bottom_fade_px = 0;
+        style.seam_cover_px = SEAM_COVER_PX;
+    } else {
+        style.bottom_fade_px = BOTTOM_FADE_PX;
+        style.seam_cover_px = 0;
+    }
     style.peak_cap = cfg.visual.peak_cap;
     style.color_bottom = color_of(&cfg.visual.color_start, style.color_bottom);
     style.color_top = color_of(&cfg.visual.color_end, style.color_top);
@@ -228,8 +255,8 @@ pub fn diff(before: &Config, after: &Config) -> Delta {
 
 #[cfg(test)]
 mod tests {
-    use super::{alpha_of, color_of, diff, gap_of, plan};
-    use spectrum_core::config::Config;
+    use super::{BOTTOM_FADE_PX, SEAM_COVER_PX, alpha_of, color_of, diff, gap_of, plan};
+    use spectrum_core::config::{Config, VisualMode};
     use spectrum_render::{PaletteMode, RenderStyle};
 
     #[test]
@@ -280,6 +307,30 @@ mod tests {
         assert_eq!(p.style.gap_px, 2);
         // 0.65 × 255 = 165.75 → 166
         assert_eq!(p.style.alpha, 166);
+        // 生产路径启用柱底渐隐；new() 默认仍为 0，历史像素证据不受影响。
+        assert_eq!(p.style.bottom_fade_px, BOTTOM_FADE_PX);
+        assert_eq!(RenderStyle::new().bottom_fade_px, 0);
+        // 默认模式（覆盖整条任务栏）不需要接缝覆盖。
+        assert_eq!(p.style.seam_cover_px, 0);
+    }
+
+    /// 任务栏上方模式必须改成"接缝覆盖"而不是"柱底渐隐"。
+    ///
+    /// 反向门：两种模式若同时开，渐隐会把任务栏顶端的深色边线暴露得更清楚，
+    /// 那条线又会从柱间隙透出来——正是用户反复反馈的"密集点状黑线"。
+    #[test]
+    fn above_dock_mode_covers_seam_instead_of_fading() {
+        let mut cfg = Config::default();
+        cfg.visual.mode = VisualMode::AboveDock;
+        let p = plan(&cfg);
+        assert_eq!(p.style.seam_cover_px, SEAM_COVER_PX);
+        assert_eq!(p.style.bottom_fade_px, 0, "上方模式不能用渐隐，否则会透出接缝线");
+
+        let mut inside = Config::default();
+        inside.visual.mode = VisualMode::FullDock;
+        let q = plan(&inside);
+        assert_eq!(q.style.seam_cover_px, 0);
+        assert_eq!(q.style.bottom_fade_px, BOTTOM_FADE_PX);
     }
 
     #[test]

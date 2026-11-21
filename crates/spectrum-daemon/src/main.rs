@@ -2713,7 +2713,13 @@ impl DockWatcher {
 /// - 右侧 (1)：`x -= width`
 /// - 左侧 (3)：`x += width`
 ///
-/// 侧边任务栏的柱状方向（横条 vs 竖条）是独立设计项，这里只保证窗口位置正确。
+/// 底部任务栏额外**向下压 1px**（[`ABOVE_DOCK_OVERLAP_PX`]）：任务栏顶端
+/// 自带一条深色边线（1.75 倍缩放下占 2 个物理行），如果窗口底边只贴到
+/// 它上方，柱间隙是透明的，那条线就会从缝隙里透出来，看起来像"密集点状黑线"。
+/// 压进去 1px 之后，渲染层的 `seam_cover_px` 才能把它整行盖住。
+///
+/// 侧边任务栏的柱状方向（横条 vs 竖条）是独立设计项，这里只保证窗口位置正确；
+/// 覆盖那条顶边线的处理只对底部任务栏生效（柱状图的"底边"就是画布底边）。
 #[cfg(feature = "x11")]
 fn above_geometry(geometry: OverlayGeometry, position: i32) -> OverlayGeometry {
     let width = i16::try_from(geometry.width).unwrap_or(i16::MAX);
@@ -2722,10 +2728,23 @@ fn above_geometry(geometry: OverlayGeometry, position: i32) -> OverlayGeometry {
         0 => (geometry.x, geometry.y.saturating_add(height)),
         1 => (geometry.x.saturating_sub(width), geometry.y),
         3 => (geometry.x.saturating_add(width), geometry.y),
-        _ => (geometry.x, geometry.y.saturating_sub(height)),
+        _ => (
+            geometry.x,
+            geometry
+                .y
+                .saturating_sub(height)
+                .saturating_add(ABOVE_DOCK_OVERLAP_PX),
+        ),
     };
     OverlayGeometry::new(x, y, geometry.width, geometry.height)
 }
+
+/// 底部任务栏场景下，频谱窗口向下压进任务栏的像素数。
+///
+/// 目的是盖住任务栏自带的深色顶边线；1px 在 1.75/2 倍缩放下会被放大成 2 个物理行，
+/// 正好与 [`spectrum_settings::apply::SEAM_COVER_PX`] 对应。
+#[cfg(feature = "x11")]
+const ABOVE_DOCK_OVERLAP_PX: i16 = 1;
 
 /// 只有几何真的变了才应用 + 报告。
 ///
@@ -2882,7 +2901,12 @@ mod tests {
         use spectrum_platform::overlay::OverlayGeometry;
 
         let bottom = OverlayGeometry::new(0, 1000, 1920, 40);
-        assert_eq!(above_geometry(bottom, 2).y, 960, "底部任务栏应向上让位");
+        // 底部任务栏：上移一个高度后**再压回 1px**，盖住任务栏自带的深色顶边线。
+        assert_eq!(
+            above_geometry(bottom, 2).y,
+            961,
+            "底部任务栏应向上让位并压住顶边线"
+        );
         assert_eq!(above_geometry(bottom, 0).y, 1040, "顶部任务栏应向下让位");
 
         let side = OverlayGeometry::new(0, 0, 40, 1080);

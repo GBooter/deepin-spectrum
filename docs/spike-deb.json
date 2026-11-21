@@ -1,8 +1,8 @@
 {
   "feature": "deb-package",
   "verdict": "PASS",
-  "package": "/media/Another/Date/AI-Date/WorkBuddy-Date/deepin 任务栏音频频谱插件/dist/deepin-spectrum_0.5.8_amd64.deb",
-  "size_bytes": 7825228,
+  "package": "/media/Another/Date/AI-Date/WorkBuddy-Date/deepin 任务栏音频频谱插件/dist/deepin-spectrum_0.5.10_amd64.deb",
+  "size_bytes": 7825780,
   "main_libs": [
     "/lib64/ld-linux-x86-64.so.2",
     "libasyncns.so.0",
@@ -55,7 +55,7 @@
       "id": "D1",
       "desc": "包已生成",
       "pass": true,
-      "detail": "/media/Another/Date/AI-Date/WorkBuddy-Date/deepin 任务栏音频频谱插件/dist/deepin-spectrum_0.5.8_amd64.deb"
+      "detail": "/media/Another/Date/AI-Date/WorkBuddy-Date/deepin 任务栏音频频谱插件/dist/deepin-spectrum_0.5.10_amd64.deb"
     },
     {
       "id": "D6",

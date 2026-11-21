@@ -28,11 +28,11 @@ fft-realfft = ["spectrum-core/fft-realfft"]
 tray = ["dep:zbus"]
 
 [dependencies]
-spectrum-core = { path = "../spectrum-core", version = "0.5.8" }
-spectrum-render = { path = "../spectrum-render", version = "0.5.8" }
-spectrum-platform = { path = "../spectrum-platform", version = "0.5.8" }
+spectrum-core = { path = "../spectrum-core", version = "0.5.10" }
+spectrum-render = { path = "../spectrum-render", version = "0.5.10" }
+spectrum-platform = { path = "../spectrum-platform", version = "0.5.10" }
 # 配置与热重载（零外部依赖的 TOML 子集 + 轮询监视）
-spectrum-settings = { path = "../spectrum-settings", version = "0.5.8" }
+spectrum-settings = { path = "../spectrum-settings", version = "0.5.10" }
 # 托盘走 StatusNotifierItem（D-Bus 服务端），需要 zbus 的 service 侧
 zbus = { version = "6.3.0", default-features = false, features = ["default-rt", "proxy", "service"], optional = true }
 

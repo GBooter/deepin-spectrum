@@ -28,5 +28,5 @@ path = "src/lib.rs"
 #     且用「截断文件 / 畸形输入永不 panic」用例兜底
 # 取舍与放弃项见 docs/设置与热重载设计.md §2。
 [dependencies]
-spectrum-core = { path = "../spectrum-core", version = "0.5.8" }
-spectrum-render = { path = "../spectrum-render", version = "0.5.8" }
+spectrum-core = { path = "../spectrum-core", version = "0.5.10" }
+spectrum-render = { path = "../spectrum-render", version = "0.5.10" }

@@ -1,7 +1,7 @@
 [package]
 name = "spectrum-settings-gui"
 # 独立 workspace，不能继承主工程的 workspace.package
-version = "0.5.8"
+version = "0.5.10"
 license = "GPL-3.0-only"
 edition = "2024"
 rust-version = "1.92"
@@ -37,8 +37,8 @@ path = "src/lib.rs"
 #   - 不用 accessibility（省掉 accesskit 及其一整棵依赖树）
 #   - 保留 femtovg（GPU 渲染，深浅色任务栏上都不糊）
 [dependencies]
-spectrum-core = { path = "../spectrum-core", version = "0.5.8" }
-spectrum-settings = { path = "../spectrum-settings", version = "0.5.8" }
+spectrum-core = { path = "../spectrum-core", version = "0.5.10" }
+spectrum-settings = { path = "../spectrum-settings", version = "0.5.10" }
 slint = { version = "1.18", default-features = false, features = [
     "std",
     "backend-winit",

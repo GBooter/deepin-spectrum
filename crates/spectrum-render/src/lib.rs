@@ -63,6 +63,19 @@ pub struct RenderStyle {
     pub top_margin_px: u16,
     /// 画布底部留白（贴着任务栏底边时通常为 0）。
     pub bottom_margin_px: u16,
+    /// 柱底渐隐高度（物理像素）。
+    ///
+    /// 最底部这么多行的 alpha 线性递减到 0，让柱体"融进"任务栏，
+    /// 消除半透明柱底压在深色任务栏上被合成成近黑硬边的观感瑕疵。
+    /// `0` 表示关闭，此时逐像素行为与旧版完全一致（像素证据门不受影响）。
+    pub bottom_fade_px: u8,
+    /// 画布最底部用于遮盖任务栏接缝的行数（物理像素）。
+    ///
+    /// 这些行会**跨整个柱槽（含间隙）**填满柱底色，用来挡住任务栏自带的
+    /// 深色顶边线：那条线在柱间隙处会透出来，看起来像"密集点状黑线"。
+    /// 只在该槽有可见柱高时才画，静音时保持全透明（不留下常驻色条）。
+    /// `0` 表示关闭，逐像素行为与旧版一致。
+    pub seam_cover_px: u16,
     /// 幅值大于 0 时的最小可见高度，避免"有声音但看不见"。
     pub min_bar_px: u16,
     /// 不透明度（0 = 全透明，255 = 不透明）。
@@ -90,6 +103,8 @@ impl RenderStyle {
             gap_px: 2,
             top_margin_px: 1,
             bottom_margin_px: 1,
+            bottom_fade_px: 0,
+            seam_cover_px: 0,
             min_bar_px: 1,
             alpha: 217,
             peak_cap: true,
@@ -108,6 +123,8 @@ impl RenderStyle {
             gap_px: 2,
             top_margin_px: 1,
             bottom_margin_px: 1,
+            bottom_fade_px: 0,
+            seam_cover_px: 0,
             min_bar_px: 1,
             alpha,
             // 像素级测试只关心柱体本身，峰值帽默认关闭。
@@ -218,6 +235,28 @@ impl SpectrumRenderer {
         let bar_width = slot_width.saturating_sub(gap);
         let bottom = height.saturating_sub(self.style.bottom_margin_px);
         let cap_thickness = u32::from(PEAK_CAP_HEIGHT_PX).min(u32::from(bottom));
+        // 接缝覆盖行取**画布最后几行**（不受 bottom_margin 影响）：
+        // 任务栏的深色顶边正好落在窗口底边，必须在最后一两行上盖住它。
+        let seam_rows = u32::from(self.style.seam_cover_px).min(u32::from(height));
+        // 有柱的槽跨度：接缝只铺在这段范围内。
+        // 只铺"有柱的那几个槽"会在中间静音槽处漏出任务栏的深色边线，
+        // 于是仍旧是一段段的黑点；铺满整幅又会留下常驻色条。
+        let active_span = if seam_rows > 0 && self.style.alpha > 0 {
+            let mut span: Option<(u32, u32)> = None;
+            for (index, &magnitude) in magnitudes.iter().enumerate() {
+                if bar_height_px(normalize_magnitude(magnitude), usable, self.style.min_bar_px) == 0 {
+                    continue;
+                }
+                let i = u32::try_from(index).unwrap_or(u32::MAX);
+                span = Some(match span {
+                    Some((first, _)) => (first, i),
+                    None => (i, i),
+                });
+            }
+            span
+        } else {
+            None
+        };
 
         let mut max_bar = 0_u16;
         let mut drawn = 0_u64;
@@ -269,6 +308,21 @@ impl SpectrumRenderer {
             }
         }
 
+        // 接缝覆盖：在"有柱的横向区间"内把最底部若干行整段填满（连柱间隙一起），
+        // 遮住任务栏自带的深色顶边线——否则那条线会从柱间隙透出来，呈密集点状。
+        // 用**不透明**色：半透明会让那条线按 alpha 比例透出来，仍旧是点状。
+        // 按槽取色，多色模式下接缝与柱底同色。
+        if let Some((first, last)) = active_span {
+            for y in (u32::from(height) - seam_rows)..u32::from(height) {
+                for index in first..=last {
+                    let slot_x0 = index * width / count_u32;
+                    let slot_x1 = (index + 1) * width / count_u32;
+                    let seam = self.bar_color_at(u32::from(usable), 0, index, count_u32, 255);
+                    drawn += surface.fill_row(y, slot_x0, slot_x1, seam);
+                }
+            }
+        }
+
         RenderStats {
             bars: count,
             slot_width_px: u16::try_from(slot_width).unwrap_or(u16::MAX),
@@ -294,6 +348,7 @@ impl SpectrumRenderer {
     ) -> u64 {
         let usable = u32::from(usable);
         let top_margin = u32::from(self.style.top_margin_px);
+        let fade = u32::from(self.style.bottom_fade_px);
         let mut written = 0_u64;
         for y in ys.x0..ys.x1 {
             // t = 该行距**柱底**多少行（0 = 最底一行），用于取渐变色。
@@ -301,6 +356,14 @@ impl SpectrumRenderer {
                 .saturating_sub(1)
                 .saturating_sub(y.saturating_sub(top_margin));
             let color = self.bar_color(usable, from_bottom, index, count);
+            // 柱底渐隐：越靠近底边 alpha 越低，让柱体柔和地融进任务栏，
+            // 消除半透明柱底被深色任务栏合成成近黑硬边 + 间隙亮点的问题。
+            // 最底行保留 1/fade 的可见度，避免极矮柱（min_bar_px）整个消失。
+            let color = if fade > 0 && from_bottom < fade {
+                scale_premultiplied(color, (from_bottom + 1) * 255 / fade)
+            } else {
+                color
+            };
             written += surface.fill_row(y, xs.x0, xs.x1, color);
         }
         written
@@ -311,6 +374,18 @@ impl SpectrumRenderer {
     /// `palette_len < 3` 或 `palette_mode == Off` 时走与 v0.4.0 完全相同的
     /// 「按柱高在 `color_bottom` → `color_top` 之间插值」，逐像素等价。
     fn bar_color(&self, usable: u32, from_bottom: u32, index: u32, count: u32) -> u32 {
+        self.bar_color_at(usable, from_bottom, index, count, self.style.alpha)
+    }
+
+    /// 同 [`Self::bar_color`]，但用指定 alpha（接缝覆盖需要不透明版本）。
+    fn bar_color_at(
+        &self,
+        usable: u32,
+        from_bottom: u32,
+        index: u32,
+        count: u32,
+        alpha: u8,
+    ) -> u32 {
         let height_t = if usable <= 1 {
             0
         } else {
@@ -339,14 +414,14 @@ impl SpectrumRenderer {
                 }
                 PaletteMode::Off => (0, 0, 0),
             };
-            return premultiply(r, g, b, self.style.alpha);
+            return premultiply(r, g, b, alpha);
         }
         let bottom = self.style.color_bottom;
         let top = self.style.color_top;
         let r = lerp_channel(bottom >> 16, top >> 16, height_t);
         let g = lerp_channel(bottom >> 8, top >> 8, height_t);
         let b = lerp_channel(bottom, top, height_t);
-        premultiply(r, g, b, self.style.alpha)
+        premultiply(r, g, b, alpha)
     }
 }
 
@@ -426,6 +501,20 @@ fn premultiply(r: u32, g: u32, b: u32, alpha: u8) -> u32 {
     let g = (g & 0xFF) * a / 255;
     let b = (b & 0xFF) * a / 255;
     (a << 24) | (r << 16) | (g << 8) | b
+}
+
+/// 按比例缩放一个预乘 alpha 颜色的**所有四个通道**（含 alpha）。
+///
+/// 预乘语义下，`k · premul(r,g,b,a) == premul(r,g,b,k·a)`，
+/// 所以四通道同乘 `factor/255` 既降低了不透明度，又保持颜色可正确合成，
+/// 不会出现"变暗但没变透明"的脏边。`factor` 需调用方保证在 `0..=255`。
+fn scale_premultiplied(argb: u32, factor: u32) -> u32 {
+    let a = (argb >> 24) & 0xFF;
+    let r = (argb >> 16) & 0xFF;
+    let g = (argb >> 8) & 0xFF;
+    let b = argb & 0xFF;
+    let scale = |v: u32| v * factor / 255;
+    (scale(a) << 24) | (scale(r) << 16) | (scale(g) << 8) | scale(b)
 }
 
 #[cfg(test)]
@@ -692,5 +781,110 @@ mod tests {
         let style = RenderStyle::new();
         assert_eq!(style.usable_height(0), 0);
         assert_eq!(style.usable_height(1), 0, "上下留白吃掉全部高度");
+    }
+
+    /// 柱底渐隐默认关闭，保证所有历史像素证据逐像素不变。
+    #[test]
+    fn bottom_fade_is_off_by_default() {
+        assert_eq!(RenderStyle::new().bottom_fade_px, 0);
+        assert_eq!(RenderStyle::flat(0xFF_FFFF, 255).bottom_fade_px, 0);
+    }
+
+    /// 开启渐隐后：柱底最底行 alpha 最低，往上逐行递增，到 fade 高度之上恢复满值。
+    #[test]
+    fn bottom_fade_ramps_alpha_from_base() {
+        let style = RenderStyle {
+            bottom_fade_px: 3,
+            ..RenderStyle::flat(0xFF_FFFF, 255)
+        };
+        let mut surface = Surface::new(10, 20);
+        // usable = 18，bottom = 19，柱覆盖 y=1..19；底行 y=18，往上 from_bottom 递增。
+        SpectrumRenderer::new(style).render(&mut surface, &[1.0]);
+        let alpha_at = |y| surface.get(5, y).map(|p| (p >> 24) & 0xFF).unwrap();
+        let base = alpha_at(18); // from_bottom = 0 → factor = 1*255/3 = 85
+        let one_up = alpha_at(17); // from_bottom = 1 → factor = 2*255/3 = 170
+        let two_up = alpha_at(16); // from_bottom = 2 → 满 255
+        assert!(base < one_up, "底行应比上一行更透明：{base} vs {one_up}");
+        assert!(one_up < two_up, "次底行应比再上一行更透明：{one_up} vs {two_up}");
+        assert_eq!(two_up, 255, "渐隐高度之上应为满 alpha");
+        assert!(base >= 80 && base <= 90, "底行约 1/3 alpha，实测 {base}");
+    }
+
+    /// 渐隐后柱底像素仍是合法的预乘颜色：alpha 降低时各通道同步降低。
+    #[test]
+    fn scale_premultiplied_keeps_channels_le_alpha() {
+        // 纯白全不透明 0xFFFFFFFF，缩放到 factor=128 → 各通道约 128。
+        let scaled = super::scale_premultiplied(0xFFFF_FFFF, 128);
+        assert_eq!(scaled >> 24, 128, "alpha 通道缩放");
+        assert_eq!(scaled & 0x00FF_FFFF, 0x0080_8080, "RGB 需随 alpha 同比缩放");
+    }
+
+    /// 接缝覆盖默认关闭：历史像素证据必须逐像素不变。
+    #[test]
+    fn seam_cover_is_off_by_default() {
+        assert_eq!(RenderStyle::new().seam_cover_px, 0);
+        assert_eq!(RenderStyle::flat(0xFF_FFFF, 255).seam_cover_px, 0);
+    }
+
+    /// 开启接缝覆盖后，画布最底部若干行必须**连柱间隙一起**填满。
+    ///
+    /// 这是"任务栏顶端深色点状线"的关键断言：只填柱体是不够的，
+    /// 间隙只要有一个像素透明，那条线就会从缝隙里透出来。
+    #[test]
+    fn seam_cover_fills_bar_gaps_in_bottom_rows() {
+        let style = RenderStyle {
+            seam_cover_px: 2,
+            ..RenderStyle::flat(0xFF_FFFF, 255)
+        };
+        let mut surface = Surface::new(10, 20);
+        // 宽度 10 / 2 柱 → 每槽 5px，间隙 2px，柱宽 3px。
+        SpectrumRenderer::new(style).render(&mut surface, &[1.0, 1.0]);
+        for y in [18, 19] {
+            for x in 0..10 {
+                let alpha = surface.get(x, y).map(|p| (p >> 24) & 0xFF).unwrap();
+                assert_eq!(alpha, 255, "底行 x={x} y={y} 应被不透明覆盖（含间隙）");
+            }
+        }
+        // 覆盖行之上仍应保留原有的间隙（不能把整根柱糊成一片）。
+        // 槽 0 的柱体占 x=1..=3，x=4 是它与槽 1 之间的间隙。
+        let gap_alpha = surface.get(4, 16).map(|p| (p >> 24) & 0xFF).unwrap();
+        assert_eq!(gap_alpha, 0, "覆盖行以上的间隙必须保持透明");
+    }
+
+    /// 静音（该槽柱高为 0）时不画接缝覆盖，避免留下常驻色条。
+    #[test]
+    fn seam_cover_skips_silent_slots() {
+        let style = RenderStyle {
+            seam_cover_px: 2,
+            ..RenderStyle::flat(0xFF_FFFF, 255)
+        };
+        let mut surface = Surface::new(10, 20);
+        SpectrumRenderer::new(style).render(&mut surface, &[1.0, 0.0]);
+        let covered = surface.get(2, 19).map(|p| (p >> 24) & 0xFF).unwrap();
+        let silent = surface.get(7, 19).map(|p| (p >> 24) & 0xFF).unwrap();
+        assert_eq!(covered, 255, "有声槽的底行应被覆盖");
+        assert_eq!(silent, 0, "静音槽不应留下色条");
+    }
+
+    /// 中间有静音槽时要跨过去连续覆盖：否则任务栏那条线会在静音槽处
+    /// 重新露出，看起来仍旧是一段段的黑点（这正是用户反复反馈的形态）。
+    #[test]
+    fn seam_cover_bridges_silent_slots_inside_span() {
+        let style = RenderStyle {
+            seam_cover_px: 2,
+            ..RenderStyle::flat(0xFF_FFFF, 255)
+        };
+        let mut surface = Surface::new(12, 20);
+        // 三槽（每槽 4px），中间槽静音，但它在"有柱区间"内 → 底行必须被盖住。
+        SpectrumRenderer::new(style).render(&mut surface, &[1.0, 0.0, 1.0]);
+        for x in [0, 2, 5, 7, 10] {
+            let alpha = surface.get(x, 19).map(|p| (p >> 24) & 0xFF).unwrap();
+            assert_eq!(alpha, 255, "底行 x={x} 应被连续覆盖（含中间的静音槽）");
+        }
+        // 区间之外（右端静音槽）不覆盖。
+        let mut outside = Surface::new(12, 20);
+        SpectrumRenderer::new(style).render(&mut outside, &[1.0, 0.0, 0.0]);
+        let tail = outside.get(9, 19).map(|p| (p >> 24) & 0xFF).unwrap();
+        assert_eq!(tail, 0, "最后一根柱之外的尾部不应有色条");
     }
 }
