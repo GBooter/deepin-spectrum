@@ -74,10 +74,10 @@ bash scripts/build-deb-uos20.sh
 
 ```bash
 # deepin 25
-sudo apt install ./deepin-spectrum_0.5.8_amd64.deb
+sudo apt install ./deepin-spectrum_0.5.10_amd64.deb
 
 # UOS 20 / Debian 10
-sudo apt install ./deepin-spectrum_0.5.8_amd64_uos20.deb
+sudo apt install ./deepin-spectrum_0.5.10_amd64_uos20.deb
 ```
 
 安装后从应用菜单打开「频谱工坊」（英文名 Spectrum Atelier），或直接运行：
@@ -93,6 +93,18 @@ systemctl --user status deepin-spectrum
 ```
 
 > 开机自启默认关闭，需要在设置界面勾选后才会创建 systemd 用户单元的 enable 链接。
+
+### 升级到新版本
+
+`apt install` / `dpkg -i` 只替换磁盘上的可执行文件，**正在运行的后台进程仍在执行旧代码**，
+所以升级后画面不会立刻变化——这是正常现象，不代表修复未生效。请重启频谱让它加载新版本：
+
+```bash
+# 若已开启开机自启（存在 systemd 用户单元）
+systemctl --user restart deepin-spectrum
+```
+
+也可以从托盘图标退出后重新启动，或重启系统。
 
 ## 使用
 

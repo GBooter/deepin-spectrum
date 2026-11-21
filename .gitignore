@@ -24,3 +24,6 @@ __pycache__/
 *.orig
 *.rej
 *~
+
+# 个人工作记忆（本地）
+/.workbuddy/

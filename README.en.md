@@ -75,10 +75,10 @@ Download the `.deb` matching your system from [Releases](../../releases):
 
 ```bash
 # deepin 25
-sudo apt install ./deepin-spectrum_0.5.8_amd64.deb
+sudo apt install ./deepin-spectrum_0.5.10_amd64.deb
 
 # UOS 20 / Debian 10
-sudo apt install ./deepin-spectrum_0.5.8_amd64_uos20.deb
+sudo apt install ./deepin-spectrum_0.5.10_amd64_uos20.deb
 ```
 
 Then open "Spectrum Atelier" from the app menu, or run:
@@ -95,6 +95,20 @@ systemctl --user status deepin-spectrum
 
 > Autostart is off by default. Enable it in the settings window to create the
 > systemd user unit symlink.
+
+### Upgrading
+
+`apt install` / `dpkg -i` only replaces the executable on disk. The **running
+daemon keeps executing the old code**, so the visuals will not change right
+after an upgrade — that is expected and does not mean the fix failed. Restart
+the service to load the new build:
+
+```bash
+# If autostart (the systemd user unit) is enabled
+systemctl --user restart deepin-spectrum
+```
+
+Quitting and relaunching from the tray icon works too, as does a reboot.
 
 ## Usage
 
