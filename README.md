@@ -51,7 +51,7 @@ Release 同时提供两个 `amd64` 包，按系统选择：
 
 | 系统 | 安装包 | 说明 |
 |---|---|---|
-| deepin 25（glibc ≥ 2.29） | `deepin-spectrum_<版本>_amd64.deb` | 在 deepin 25 上原生编译 |
+| deepin 25（glibc ≥ 2.34） | `deepin-spectrum_<版本>_amd64.deb` | 在 deepin 25 上原生编译，符号上限 `GLIBC_2.34` |
 | UOS 20 / Debian 10（glibc 2.28） | `deepin-spectrum_<版本>_amd64_uos20.deb` | 在 glibc 2.28 容器中编译，符号上限 `GLIBC_2.28` |
 
 不能共用一个包：deepin 25 编译出的二进制带 `GLIBC_2.29 ~ GLIBC_2.34` 符号，

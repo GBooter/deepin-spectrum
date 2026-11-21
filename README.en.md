@@ -52,7 +52,7 @@ Each release ships two `amd64` packages:
 
 | System | Package | Notes |
 |---|---|---|
-| deepin 25 (glibc ≥ 2.29) | `deepin-spectrum_<version>_amd64.deb` | built natively on deepin 25 |
+| deepin 25 (glibc ≥ 2.34) | `deepin-spectrum_<version>_amd64.deb` | built natively on deepin 25; highest symbol is `GLIBC_2.34` |
 | UOS 20 / Debian 10 (glibc 2.28) | `deepin-spectrum_<version>_amd64_uos20.deb` | built in a glibc 2.28 container; highest symbol is `GLIBC_2.28` |
 
 One package cannot serve both: binaries built on deepin 25 reference `GLIBC_2.29 ~ GLIBC_2.34`,
