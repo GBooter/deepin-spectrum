@@ -1235,6 +1235,12 @@ fn run_loop_x11(
     } else {
         println!("stacking    : managed（受管窗口；显示桌面会隐藏频谱）");
     }
+    if or_mode && !session.above_dock && !overlay.compositing_active() {
+        eprintln!(
+            "提示：未检测到窗口合成（窗口特效），全栏模式无法透出频谱；\
+             请在控制中心开启「窗口特效」，或改用「任务栏上方」模式。"
+        );
+    }
     let actual = {
         use spectrum_platform::overlay::OverlayBackend;
         overlay.geometry().map_err(|e| e.to_string())?
@@ -1405,10 +1411,14 @@ fn run_loop_x11(
             }
             // 锁屏期间不再置顶，避免 OR 窗口盖在锁屏层上。
             if overlay.is_override_redirect() && !session.hidden_by_lock {
+                // 常规模式置顶；UOS 20 全栏模式在合成可用时压到 dde-dock 之下，
+                // 让任务栏图标保持在频谱之上（与 deepin 25 观感一致）。
                 tolerate(
                     &mut failures,
-                    "窗口置顶",
-                    overlay.raise().map_err(|e| e.to_string()),
+                    "窗口层叠",
+                    overlay
+                        .keep_stacked(session.above_dock)
+                        .map_err(|e| e.to_string()),
                 )?;
             }
         }

@@ -1,8 +1,8 @@
 {
   "feature": "deb-package",
   "verdict": "PASS",
-  "package": "/src/dist/uos20/deepin-spectrum_0.5.8_amd64_uos20.deb",
-  "size_bytes": 7820496,
+  "package": "/src/dist/uos20/deepin-spectrum-uos20_0.5.12_amd64.deb",
+  "size_bytes": 8149388,
   "main_libs": [
     "/lib64/ld-linux-x86-64.so.2",
     "libFLAC.so.8",
@@ -64,7 +64,7 @@
       "id": "D1",
       "desc": "包已生成",
       "pass": true,
-      "detail": "/src/dist/uos20/deepin-spectrum_0.5.8_amd64_uos20.deb"
+      "detail": "/src/dist/uos20/deepin-spectrum-uos20_0.5.12_amd64.deb"
     },
     {
       "id": "D6",

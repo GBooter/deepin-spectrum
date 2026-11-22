@@ -24,8 +24,8 @@
 #   - 首次运行会拉取 debian:buster-slim 镜像（约 27MB）
 #
 # 产物：
-#     dist/uos20/deepin-spectrum_<版本>_amd64_uos20.deb
-#     dist/uos20/deepin-spectrum_<版本>_amd64_uos20.deb.sha256
+#     dist/uos20/deepin-spectrum-uos20_<版本>_amd64.deb
+#     dist/uos20/deepin-spectrum-uos20_<版本>_amd64.deb.sha256
 #     docs/spike-deb-uos20.json          结构化证据
 #
 # 只支持在 x86_64 宿主上打 amd64 包（与开发机一致），不做交叉编译。
@@ -124,12 +124,13 @@ podman exec \
     -e CARGO_NET_OFFLINE=true \
     -e DIST_DIR=/src/dist/uos20 \
     -e SPIKE_JSON=/src/docs/spike-deb-uos20.json \
-    -e PKG_FILE_TAG=_uos20 \
+    -e PKG_NAME=deepin-spectrum-uos20 \
+    -e "DEEPIN_SPECTRUM_APP_LABEL=UOS 20" \
     -w /src "$CONTAINER" bash scripts/build-deb.sh \
     || die "构建或打包失败（见上方日志）"
 
 # ---- 核对产物 ---------------------------------------------------------------
-DEB="$DIST_DIR/deepin-spectrum_$(awk -F'"' '/^\[workspace\.package\]/{f=1; next} f && /^version/{print $2; exit}' Cargo.toml)_amd64_uos20.deb"
+DEB="$DIST_DIR/deepin-spectrum-uos20_$(awk -F'"' '/^\[workspace\.package\]/{f=1; next} f && /^version/{print $2; exit}' Cargo.toml)_amd64.deb"
 [[ -f "$DEB" ]] || die "未找到产物：$DEB"
 
 podman exec -e MAX_GLIBC="$MAX_GLIBC" "$CONTAINER" bash -c '

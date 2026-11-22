@@ -52,7 +52,7 @@ Release 同时提供两个 `amd64` 包，按系统选择：
 | 系统 | 安装包 | 说明 |
 |---|---|---|
 | deepin 25（glibc ≥ 2.34） | `deepin-spectrum_<版本>_amd64.deb` | 在 deepin 25 上原生编译，符号上限 `GLIBC_2.34` |
-| UOS 20 / Debian 10（glibc 2.28） | `deepin-spectrum_<版本>_amd64_uos20.deb` | 在 glibc 2.28 容器中编译，符号上限 `GLIBC_2.28` |
+| UOS 20 / Debian 10（glibc 2.28） | `deepin-spectrum-uos20_<版本>_amd64.deb` | 包名与应用名带 `UOS 20` 标识；在 glibc 2.28 容器中编译，符号上限 `GLIBC_2.28` |
 
 不能共用一个包：deepin 25 编译出的二进制带 `GLIBC_2.29 ~ GLIBC_2.34` 符号，
 而 UOS 20 的 glibc 只有 2.28，运行时报 `version 'GLIBC_2.34' not found`。
@@ -65,7 +65,7 @@ bash scripts/build-deb-uos20.sh
 ```
 
 脚本会在 Debian 10 容器（glibc 2.28，与 UOS 20 同源）里重新编译并打包，
-产物为 `dist/uos20/deepin-spectrum_<版本>_amd64_uos20.deb`，并自动校验符号上限不超过 `GLIBC_2.28`。
+产物为 `dist/uos20/deepin-spectrum-uos20_<版本>_amd64.deb`，并自动校验符号上限不超过 `GLIBC_2.28`。
 需要 podman 和项目已有的离线工具链（`.dev-env/`）。
 
 ## 安装
@@ -74,10 +74,10 @@ bash scripts/build-deb-uos20.sh
 
 ```bash
 # deepin 25
-sudo apt install ./deepin-spectrum_0.5.10_amd64.deb
+sudo apt install ./deepin-spectrum_0.5.12_amd64.deb
 
 # UOS 20 / Debian 10
-sudo apt install ./deepin-spectrum_0.5.10_amd64_uos20.deb
+sudo apt install ./deepin-spectrum-uos20_0.5.12_amd64.deb
 ```
 
 安装后从应用菜单打开「频谱工坊」（英文名 Spectrum Atelier），或直接运行：

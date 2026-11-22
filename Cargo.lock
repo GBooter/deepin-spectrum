@@ -556,7 +556,7 @@ dependencies = [
 
 [[package]]
 name = "spectrum-core"
-version = "0.5.10"
+version = "0.5.12"
 dependencies = [
  "libpulse-binding",
  "realfft",
@@ -565,7 +565,7 @@ dependencies = [
 
 [[package]]
 name = "spectrum-daemon"
-version = "0.5.10"
+version = "0.5.12"
 dependencies = [
  "spectrum-core",
  "spectrum-platform",
@@ -576,7 +576,7 @@ dependencies = [
 
 [[package]]
 name = "spectrum-platform"
-version = "0.5.10"
+version = "0.5.12"
 dependencies = [
  "smithay-client-toolkit",
  "spectrum-core",
@@ -588,11 +588,11 @@ dependencies = [
 
 [[package]]
 name = "spectrum-render"
-version = "0.5.10"
+version = "0.5.12"
 
 [[package]]
 name = "spectrum-settings"
-version = "0.5.10"
+version = "0.5.12"
 dependencies = [
  "spectrum-core",
  "spectrum-render",

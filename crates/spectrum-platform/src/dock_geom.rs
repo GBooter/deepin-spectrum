@@ -50,18 +50,46 @@ pub const DOCK_INTERFACE: &str = "org.deepin.dde.Dock1";
 /// 两个接口共用的对象路径。
 pub const DOCK_OBJECT_PATH: &str = "/org/deepin/dde/Dock1";
 
+// ---- UOS 20 / dde-dock 老接口 ----------------------------------------------
+//
+// UOS 20（DDE 4.x）的 dde-dock 没有 `org.deepin.dde.*Dock1`，只有下面这套
+// `com.deepin.dde.*`。属性名相同（`FrontendWindowRect` / `Position`），但
+// 对象路径不同，且**没有矩形变更信号**（introspect 里只有 PropertiesChanged），
+// 所以老接口只能低频轮询属性。
+
+/// 老接口的 daemon 服务/接口名（物理矩形 `FrontendWindowRect`）。
+pub const LEGACY_DAEMON_INTERFACE: &str = "com.deepin.dde.daemon.Dock";
+/// 老接口的对象路径。
+pub const LEGACY_DAEMON_PATH: &str = "/com/deepin/dde/daemon/Dock";
+/// 老接口轮询间隔：老接口没有变更信号，只能轮询；1s 足够且开销可忽略。
+const LEGACY_POLL_MS: u64 = 1_000;
+
 /// 读取任务栏当前停靠位置（0=top / 1=right / 2=bottom / 3=left）。
 ///
 /// 订阅只会在位置**变化**时发 `PositionChanged`；启动时若用户本来就把
 /// 任务栏放在顶部/侧边，必须主动回读一次，否则第一帧会按底部计算偏移。
 #[must_use]
 pub fn read_position() -> Option<i32> {
-    zbus::block_on(async {
+    let modern = zbus::block_on(async {
         let conn = zbus::Connection::session().await.ok()?;
         let proxy = Proxy::new(&conn, DAEMON_INTERFACE, DOCK_OBJECT_PATH, DAEMON_INTERFACE)
             .await
             .ok()?;
         proxy.get_property("Position").await.ok()
+    });
+    modern.or_else(|| {
+        zbus::block_on(async {
+            let conn = zbus::Connection::session().await.ok()?;
+            let proxy = Proxy::new(
+                &conn,
+                LEGACY_DAEMON_INTERFACE,
+                LEGACY_DAEMON_PATH,
+                LEGACY_DAEMON_INTERFACE,
+            )
+            .await
+            .ok()?;
+            proxy.get_property("Position").await.ok()
+        })
     })
 }
 
@@ -72,7 +100,7 @@ pub fn read_position() -> Option<i32> {
 /// 只在尺寸模式变化（低频事件）时调用，阻塞一次 D-Bus 往返可以接受。
 #[must_use]
 pub fn read_rect(rect_source: RectSource) -> Option<DockEvent> {
-    zbus::block_on(async {
+    let modern = zbus::block_on(async {
         let conn = zbus::Connection::session().await.ok()?;
         let owner = match rect_source {
             RectSource::Physical => DAEMON_INTERFACE,
@@ -82,7 +110,115 @@ pub fn read_rect(rect_source: RectSource) -> Option<DockEvent> {
             .await
             .ok()?;
         read_authoritative_rect(&proxy, rect_source).await
+    });
+    modern.or_else(read_legacy_rect)
+}
+
+/// 读取 UOS 20 / dde-dock 老接口的物理矩形（阻塞调用）。
+///
+/// 老接口的 `FrontendWindowRect` 签名是 `(iiuu)`（宽高为 `u32`），
+/// 不能复用按 `(iiii)` 解析的 `read_authoritative_rect`。
+#[must_use]
+pub fn read_legacy_rect() -> Option<DockEvent> {
+    zbus::block_on(async {
+        let conn = zbus::Connection::session().await.ok()?;
+        let proxy = Proxy::new(
+            &conn,
+            LEGACY_DAEMON_INTERFACE,
+            LEGACY_DAEMON_PATH,
+            LEGACY_DAEMON_INTERFACE,
+        )
+        .await
+        .ok()?;
+        let (x, y, width, height) = proxy
+            .get_property::<(i32, i32, u32, u32)>("FrontendWindowRect")
+            .await
+            .ok()?;
+        Some(DockEvent::RectChanged {
+            x,
+            y,
+            width,
+            height,
+        })
     })
+}
+
+/// 老接口轮询线程：服务不存在时立即退出，不影响新接口订阅。
+///
+/// 老接口没有矩形/位置变更信号，只能按 [`LEGACY_POLL_MS`] 回读属性；
+/// 值不变时不重复投递，避免给节流桥制造无意义事件。
+fn spawn_legacy_poller(tx: &Sender<DockEvent>) {
+    let tx = tx.clone();
+    let _ = std::thread::Builder::new()
+        .name("deepin-spectrum-dbus-legacy".to_owned())
+        .spawn(move || {
+            if !zbus::block_on(legacy_service_present()) {
+                return;
+            }
+            let mut last_rect: Option<DockEvent> = None;
+            let mut last_position: Option<i32> = None;
+            loop {
+                let snapshot = zbus::block_on(read_legacy_snapshot());
+                if let Some((rect, position)) = snapshot {
+                    if last_rect != Some(rect) {
+                        last_rect = Some(rect);
+                        if tx.send(rect).is_err() {
+                            return;
+                        }
+                    }
+                    if let Some(position) = position
+                        && last_position != Some(position)
+                    {
+                        last_position = Some(position);
+                        if tx.send(DockEvent::PositionChanged(position)).is_err() {
+                            return;
+                        }
+                    }
+                }
+                std::thread::sleep(std::time::Duration::from_millis(LEGACY_POLL_MS));
+            }
+        });
+}
+
+/// 老接口服务是否存在（只探测一次，避免在新系统上永久轮询无人应答的名字）。
+async fn legacy_service_present() -> bool {
+    let Ok(conn) = zbus::Connection::session().await else {
+        return false;
+    };
+    let Ok(dbus) = zbus::fdo::DBusProxy::new(&conn).await else {
+        return false;
+    };
+    let Ok(name) = zbus::names::BusName::try_from(LEGACY_DAEMON_INTERFACE) else {
+        return false;
+    };
+    dbus.name_has_owner(name).await.unwrap_or(false)
+}
+
+/// 一次老接口快照：矩形 + 停靠位置。
+async fn read_legacy_snapshot() -> Option<(DockEvent, Option<i32>)> {
+    let conn = zbus::Connection::session().await.ok()?;
+    let proxy = Proxy::new(
+        &conn,
+        LEGACY_DAEMON_INTERFACE,
+        LEGACY_DAEMON_PATH,
+        LEGACY_DAEMON_INTERFACE,
+    )
+    .await
+    .ok()?;
+    let (x, y, width, height) = proxy
+        .get_property::<(i32, i32, u32, u32)>("FrontendWindowRect")
+        .await
+        .ok()?;
+    let position = proxy.get_property::<i32>("Position").await.ok();
+    Some((
+        DockEvent::RectChanged {
+            x,
+            y,
+            width,
+            height,
+        },
+        position,
+    ))
 }
 
 /// 订阅失败或连接丢失的原因。
@@ -176,6 +312,10 @@ impl DockSubscription {
             spawn_watchdog(Watch::Interface(DOCK_INTERFACE), rect_source, &tx, &err_tx),
             spawn_watchdog(Watch::Properties, rect_source, &tx, &err_tx),
         ];
+
+        // UOS 20 / dde-dock 兼容：老接口没有变更信号，单独用低频轮询补一条
+        // 事件源；服务不存在时线程立即退出，不影响上面三路新接口订阅。
+        spawn_legacy_poller(&tx);
 
         for handle in handles {
             match handle {

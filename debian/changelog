@@ -1,3 +1,30 @@
+deepin-spectrum (0.5.12) unstable; urgency=medium
+
+  * 发布 deepin 25 安装包，包含 0.5.11 的全部修复：
+    设置界面 GLX 失败自动切换软件渲染；UOS 20 老版 dde-dock 的
+    任务栏几何读取与轮询；全栏模式下叠加层下沉到任务栏之下，图标
+    保持在频谱之上（未开启窗口特效时自动回退并提示）。
+  * UOS 20 兼容包的包名改为 deepin-spectrum-uos20，应用显示名与
+    包描述附带 UOS 20 标识，便于在商店中与 deepin 25 版本区分。
+
+ -- deepin-spectrum maintainers <maintainers@example.invalid>  Sun, 22 Nov 2026 15:05:00 +0800
+
+deepin-spectrum (0.5.11) unstable; urgency=medium
+
+  * 修复：UOS 20（glibc 2.28 / Mesa 19.2 llvmpipe）上点图标无反应。
+    根因是 femtovg 走 GLX 创建 OpenGL 上下文时报 GLXBadContextTag，
+    winit 在设置窗口主题后 flush 请求直接 panic，进程在建窗前退出。
+    现在设置界面先以 femtovg 启动，非正常退出时自动改用 Slint 软件
+    渲染器重试一次（随包编译，无需 GPU/GLX）。
+  * 修复：UOS 20（dde-dock 老 D-Bus 接口）上任务栏几何取不到，频谱被
+    兜底画到屏幕左上角。新增 com.deepin.dde.daemon.Dock 的
+    FrontendWindowRect / Position 兼容读取与低频轮询，频谱恢复贴任务栏。
+  * 适配：UOS 20 全栏模式下把叠加层压到 dde-dock 之下（仅在检测到
+    窗口合成时），任务栏图标保持在频谱之上，观感与 deepin 25 一致；
+    未开启窗口特效时自动回退为置顶并提示。
+
+ -- deepin-spectrum maintainers <maintainers@example.invalid>  Sun, 22 Nov 2026 12:40:00 +0800
+
 deepin-spectrum (0.5.10) unstable; urgency=medium
 
   * 修复：任务栏上方模式下，频谱底部与任务栏之间那条"密集点状黑线"。

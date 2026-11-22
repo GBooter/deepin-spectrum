@@ -1,14 +1,15 @@
 {
   "feature": "deb-package",
   "verdict": "PASS",
-  "package": "/media/Another/Date/AI-Date/WorkBuddy-Date/deepin 任务栏音频频谱插件/dist/deepin-spectrum_0.5.10_amd64.deb",
-  "size_bytes": 7825780,
+  "package": "/media/Another/Date/AI-Date/WorkBuddy-Date/deepin 任务栏音频频谱插件/dist/deepin-spectrum_0.5.12_amd64.deb",
+  "size_bytes": 8150908,
   "main_libs": [
     "/lib64/ld-linux-x86-64.so.2",
     "libasyncns.so.0",
     "libcap.so.2",
     "libc.so.6",
     "libdbus-1.so.3",
+    "libdl.so.2",
     "libFLAC.so.8",
     "libgcc_s.so.1",
     "libgcrypt.so.20",
@@ -20,9 +21,12 @@
     "libm.so.6",
     "libogg.so.0",
     "libopus.so.0",
+    "libpthread.so.0",
     "libpulsecommon-17.0.so",
     "libpulse.so.0",
+    "librt.so.1",
     "libsndfile.so.1",
+    "libstdc++.so.6",
     "libsystemd.so.0",
     "libvorbisenc.so.2",
     "libvorbis.so.0",
@@ -33,7 +37,8 @@
     "libXdmcp.so.6",
     "libxxhash.so.0",
     "libzstd.so.1",
-    "linux-vdso.so.1"
+    "linux-vdso.so.1",
+    "/usr/share/trae-cn/resources/app/modules/sandbox/sbox.so"
   ],
   "gui_libs": [
     "/lib64/ld-linux-x86-64.so.2",
@@ -41,21 +46,26 @@
     "libbrotlidec.so.1",
     "libbz2.so.1.0",
     "libc.so.6",
+    "libdl.so.2",
     "libexpat.so.1",
     "libfontconfig.so.1",
     "libfreetype.so.6",
     "libgcc_s.so.1",
     "libm.so.6",
     "libpng16.so.16",
+    "libpthread.so.0",
+    "librt.so.1",
+    "libstdc++.so.6",
     "libz.so.1",
-    "linux-vdso.so.1"
+    "linux-vdso.so.1",
+    "/usr/share/trae-cn/resources/app/modules/sandbox/sbox.so"
   ],
   "checks": [
     {
       "id": "D1",
       "desc": "包已生成",
       "pass": true,
-      "detail": "/media/Another/Date/AI-Date/WorkBuddy-Date/deepin 任务栏音频频谱插件/dist/deepin-spectrum_0.5.10_amd64.deb"
+      "detail": "/media/Another/Date/AI-Date/WorkBuddy-Date/deepin 任务栏音频频谱插件/dist/deepin-spectrum_0.5.12_amd64.deb"
     },
     {
       "id": "D6",

@@ -146,6 +146,9 @@ pub struct Strings {
     pub about_thanks: &'static str,
 }
 
+/// 打包时可注入的发行版标签（如 `UOS 20`），用于在应用内显示不同的软件名称。
+pub const APP_LABEL: Option<&str> = option_env!("DEEPIN_SPECTRUM_APP_LABEL");
+
 /// 简体中文文案。
 pub const ZH: Strings = Strings {
     app_name: "频谱工坊",

@@ -100,9 +100,9 @@ pub fn screen_size() -> Option<(u16, u16)> {
 use x11rb::connection::Connection;
 use x11rb::protocol::shape::{ConnectionExt as _, SK, SO};
 use x11rb::protocol::xproto::{
-    ClipOrdering, Colormap, ColormapAlloc, ConfigureWindowAux, ConnectionExt as _, CreateGCAux,
-    CreateWindowAux, EventMask, Gcontext, ImageFormat, Pixmap, PropMode, Rectangle, StackMode,
-    VisualClass, Window, WindowClass,
+    AtomEnum, ClipOrdering, Colormap, ColormapAlloc, ConfigureWindowAux, ConnectionExt as _,
+    CreateGCAux, CreateWindowAux, EventMask, Gcontext, ImageFormat, MapState, Pixmap, PropMode,
+    Rectangle, StackMode, VisualClass, Window, WindowClass,
 };
 use x11rb::rust_connection::RustConnection;
 use x11rb::wrapper::ConnectionExt as _;
@@ -173,6 +173,10 @@ pub struct X11Overlay {
     ///
     /// 每帧 `Vec::new` 会反复分配 ~1.5MB；这里按尺寸复用同一块内存。
     image_bytes: Vec<u8>,
+    /// 是否已把窗口压到 dde-dock 之下（UOS 20 全栏模式）。
+    below_dock: bool,
+    /// `keep_stacked` 调用计数，用于把「复查层叠」节流到约 2 秒一次。
+    restack_tick: u64,
 }
 
 impl std::fmt::Debug for X11Overlay {
@@ -256,6 +260,8 @@ impl X11Overlay {
             back_size: (0, 0),
             gc: 0,
             image_bytes: Vec::new(),
+            below_dock: false,
+            restack_tick: 0,
         };
 
         overlay.validate(geometry)?;
@@ -540,6 +546,139 @@ impl X11Overlay {
             ),
         )?;
         self.flush()
+    }
+
+    /// 当前 X server 上是否有窗口合成器。
+    ///
+    /// deepin 25 始终有合成（`_NET_WM_CM_S0` 有 owner）；UOS 20 的 kwin 实测
+    /// **不导出**该 atom，只能退而读 `~/.config/kwinrc` 的
+    /// `[Compositing] Enabled`（控制中心「窗口特效」写的也是它）。
+    /// 没有合成时 depth-32 窗口的透明像素会渲染成黑色，不能再指望“透出下层”。
+    #[must_use]
+    pub fn compositing_active(&self) -> bool {
+        if let Ok(atom) = self.atom("_NET_WM_CM_S0")
+            && let Some(reply) = self
+                .conn
+                .get_selection_owner(atom)
+                .ok()
+                .and_then(|c| c.reply().ok())
+            && reply.owner != 0
+        {
+            return true;
+        }
+        kwinrc_compositing_enabled()
+    }
+
+    /// 维持叠加层层叠：常规置顶；全栏模式压到 dde-dock 之下。
+    ///
+    /// # 为什么需要它
+    ///
+    /// deepin 25 的 dde-shell 是 Wayland 面板，插件画在面板内部，图标天然
+    /// 在上层。UOS 20 的 dde-dock 是独立的 X11 窗口，只能靠层叠顺序：
+    /// 压在它之下，图标才不会被频谱盖住；合成的半透明 dock 背景让柱子透出，
+    /// 观感与 deepin 25 一致。
+    ///
+    /// 只在**检测到合成器**时下沉：没有合成时 dock 是不透明窗口，下沉后频谱
+    /// 会被完全挡住（等于消失），此时按旧行为置顶。
+    ///
+    /// 每帧调用；窗口树遍历被节流到约 2 秒一次，其余帧只做廉价判断。
+    ///
+    /// # Errors
+    ///
+    /// X11 调用失败时返回错误。
+    pub fn keep_stacked(&mut self, above_dock: bool) -> Result<(), OverlayError> {
+        self.restack_tick = self.restack_tick.wrapping_add(1);
+        let reevaluate = self.restack_tick == 1 || self.restack_tick.is_multiple_of(60);
+        if above_dock {
+            self.below_dock = false;
+            return self.raise();
+        }
+        if self.below_dock && !reevaluate {
+            return Ok(());
+        }
+        if reevaluate
+            && self.compositing_active()
+            && let Some(dock) = self.find_dock_container()
+        {
+            Self::xerr(
+                "configure_window(StackMode::BELOW dde-dock)",
+                self.conn.configure_window(
+                    self.win,
+                    &ConfigureWindowAux::new()
+                        .sibling(dock)
+                        .stack_mode(StackMode::BELOW),
+                ),
+            )?;
+            self.below_dock = true;
+            return self.flush();
+        }
+        self.below_dock = false;
+        self.raise()
+    }
+
+    /// 找到 dde-dock 所在根级窗口（用于 `StackMode::BELOW` 的 sibling）。
+    ///
+    /// UOS 20 的可见 dock 条嵌在两层窗口里，而 `sibling` 必须与叠加层同父，
+    /// 所以返回的是**根级祖先**，不是 dock 本身。
+    fn find_dock_container(&self) -> Option<Window> {
+        let root = self.conn.setup().roots.get(self.screen_num)?.root;
+        let tree = self.conn.query_tree(root).ok()?.reply().ok()?;
+        tree.children
+            .iter()
+            .copied()
+            .find(|&child| self.subtree_has_dde_dock(child, 0))
+    }
+
+    /// 子树里是否存在可见的 dde-dock 窗口条。
+    fn subtree_has_dde_dock(&self, win: Window, depth: u8) -> bool {
+        if depth > 4 {
+            return false;
+        }
+        let Some(attrs) = self
+            .conn
+            .get_window_attributes(win)
+            .ok()
+            .and_then(|c| c.reply().ok())
+        else {
+            return false;
+        };
+        let Some(geo) = self
+            .conn
+            .get_geometry(win)
+            .ok()
+            .and_then(|c| c.reply().ok())
+        else {
+            return false;
+        };
+        if attrs.map_state == MapState::VIEWABLE
+            && geo.width > self.screen_width / 2
+            && (8..=200).contains(&geo.height)
+            && self.is_dde_dock(win)
+        {
+            return true;
+        }
+        let Some(tree) = self.conn.query_tree(win).ok().and_then(|c| c.reply().ok()) else {
+            return false;
+        };
+        tree.children
+            .iter()
+            .any(|&child| self.subtree_has_dde_dock(child, depth + 1))
+    }
+
+    /// 窗口的 `WM_CLASS` 是否为 dde-dock（UOS 20）。
+    fn is_dde_dock(&self, win: Window) -> bool {
+        let Some(reply) = self
+            .conn
+            .get_property(false, win, AtomEnum::WM_CLASS, AtomEnum::STRING, 0, 256)
+            .ok()
+            .and_then(|c| c.reply().ok())
+        else {
+            return false;
+        };
+        // WM_CLASS = instance\0class\0
+        let mut parts = reply.value.split(|byte| *byte == 0);
+        let _instance = parts.next();
+        matches!(parts.next(), Some(class) if class == b"dde-dock")
     }
 
     /// 输入区重设次数（尺寸变化后应为每次 +1）。
@@ -923,6 +1062,40 @@ impl Drop for X11Overlay {
         // 兜底：绝不在用户桌面留下残留窗口。失败也不 panic。
         let _ = self.destroy();
     }
+}
+
+/// 读 `~/.config/kwinrc` 的 `[Compositing] Enabled`。
+///
+/// UOS 20 的 kwin 实测不导出 `_NET_WM_CM_S0`，这是判断「窗口特效」是否开启
+/// 的唯一可靠途径（控制中心写的就是这个键）。文件或键缺失时按 DDE 默认
+/// （开启）处理，避免误判导致频谱被不透明 dock 挡住。
+fn kwinrc_compositing_enabled() -> bool {
+    let Some(text) = std::env::var_os("XDG_CONFIG_HOME")
+        .map(std::path::PathBuf::from)
+        .filter(|dir| dir.is_absolute())
+        .or_else(|| {
+            std::env::var_os("HOME").map(|home| std::path::PathBuf::from(home).join(".config"))
+        })
+        .map(|dir| dir.join("kwinrc"))
+        .and_then(|path| std::fs::read_to_string(path).ok())
+    else {
+        return true;
+    };
+    let mut in_section = false;
+    for line in text.lines() {
+        let line = line.trim();
+        if line.starts_with('[') {
+            in_section = line.eq_ignore_ascii_case("[Compositing]");
+            continue;
+        }
+        if in_section
+            && let Some((key, value)) = line.split_once('=')
+            && key.trim().eq_ignore_ascii_case("Enabled")
+        {
+            return !value.trim().eq_ignore_ascii_case("false");
+        }
+    }
+    true
 }
 
 #[cfg(test)]

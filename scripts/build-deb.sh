@@ -46,7 +46,9 @@ MAIN_TARGET_DIR="${CARGO_TARGET_DIR:-$ROOT/target}"
 GUI_TARGET_DIR="${CARGO_TARGET_DIR:-$ROOT/crates/spectrum-settings-gui/target}"
 mkdir -p "$TMPDIR" "$DIST_DIR" "$(dirname "$SPIKE_JSON")"
 
-PKG_NAME="deepin-spectrum"
+PKG_NAME="${PKG_NAME:-deepin-spectrum}"
+# 发行版标签（如 UOS 20）：用于应用显示名与包描述，避免商店中的同名冲突。
+APP_LABEL="${DEEPIN_SPECTRUM_APP_LABEL:-}"
 # 版本单一来源：主 workspace 的 `[workspace.package] version`（GUI crate 与 changelog 同步跟它）。
 PKG_VERSION="$(awk -F'"' '/^\[workspace\.package\]/{f=1; next} f && /^version/{print $2; exit}' Cargo.toml)"
 [[ -n "$PKG_VERSION" ]] || { echo "无法从 Cargo.toml 读取版本号" >&2; exit 1; }
@@ -140,7 +142,17 @@ mkdir -p "$TREE/DEBIAN" \
 
 install -m 0755 "$MAIN_BIN" "$TREE/usr/bin/deepin-spectrum"
 install -m 0755 "$GUI_BIN"  "$TREE/usr/bin/deepin-spectrum-settings"
-install -m 0644 data/deepin-spectrum.desktop "$TREE/usr/share/applications/deepin-spectrum.desktop"
+if [[ -n "$APP_LABEL" ]]; then
+    # 带标签的桌面入口：Name/Comment 追加发行版标识，Exec/Icon 不变。
+    sed -e "s/^Name=频谱工坊\$/Name=频谱工坊 $APP_LABEL/" \
+        -e "s/^Name\\[en\\]=Spectrum Atelier\$/Name[en]=Spectrum Atelier $APP_LABEL/" \
+        -e "s/^Comment=让任务栏跟着声音呼吸 · 实时音频频谱\$/Comment=让任务栏跟着声音呼吸 · 实时音频频谱（$APP_LABEL 兼容版）/" \
+        -e "s/^Comment\\[en\\]=Live audio spectrum for the Deepin dock\$/Comment[en]=Live audio spectrum for the Deepin dock ($APP_LABEL compatible)/" \
+        data/deepin-spectrum.desktop > "$TREE/usr/share/applications/deepin-spectrum.desktop"
+    chmod 0644 "$TREE/usr/share/applications/deepin-spectrum.desktop"
+else
+    install -m 0644 data/deepin-spectrum.desktop "$TREE/usr/share/applications/deepin-spectrum.desktop"
+fi
 # 托盘不再单独占应用菜单入口：改由设置窗口里的开关启停（0.2.6）。
 install -m 0644 data/deepin-spectrum.png    "$TREE/usr/share/icons/hicolor/256x256/apps/deepin-spectrum.png"
 install -m 0644 data/deepin-spectrum-32.png "$TREE/usr/share/icons/hicolor/32x32/apps/deepin-spectrum.png"
@@ -171,7 +183,7 @@ Maintainer: Deepin Spectrum Contributors <deepin-spectrum@localhost>
 Depends: libc6, libfontconfig1, libfreetype6, libpulse0, libgl1, libegl1, libxkbcommon0, libxkbcommon-x11-0, libx11-6, libxcursor1, libxrandr2, libxi6, libwayland-client0
 Section: utils
 Priority: optional
-Description: 频谱工坊 - Deepin 任务栏音频频谱
+Description: 频谱工坊${APP_LABEL:+ $APP_LABEL} - Deepin 任务栏音频频谱
  在 Deepin 任务栏上显示系统混音的实时频谱柱。
  独立常驻进程，不修改 dde-shell 源码：
  PulseAudio 采集 → FFT → 空输入区叠加表面（XShape 穿透）。
@@ -283,8 +295,8 @@ required = [
     "/usr/lib/systemd/user/deepin-spectrum.service",
     "/usr/share/man/man1/deepin-spectrum.1",
     "/usr/share/icons/hicolor/256x256/apps/deepin-spectrum.png",
-    "/usr/share/doc/deepin-spectrum/copyright",
-    "/usr/share/doc/deepin-spectrum/LICENSE.GPL-3",
+    f"/usr/share/doc/{pkg_name}/copyright",
+    f"/usr/share/doc/{pkg_name}/LICENSE.GPL-3",
 ]
 # dpkg-deb --contents 的路径形如 `./usr/bin/...`（required 里已是 /usr/bin/...）
 missing = [p for p in required if f"./{p[1:]}" not in contents]

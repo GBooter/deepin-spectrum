@@ -187,7 +187,11 @@ fn palette_samples(palette: &str, start_hex: &str, end_hex: &str) -> [u32; 5] {
 /// 静态文案表 → Slint 生成的结构。
 fn to_slint_strings(s: &i18n::Strings) -> SlintStrings {
     SlintStrings {
-        app_name: s.app_name.into(),
+        app_name: match i18n::APP_LABEL {
+            Some(label) => format!("{} {label}", s.app_name),
+            None => s.app_name.to_string(),
+        }
+        .into(),
         contents: s.contents.into(),
         mast_title: s.mast_title.into(),
         custom_label: s.custom_label.into(),
